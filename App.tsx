@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, ProductCategory, CartItem, DailyContent, CreatorStats, ShopSettings, UserProfile, Message } from './types';
+import { Product, ProductCategory, CartItem, CreatorStats, ShopSettings, UserProfile, Message } from './types';
 import ProductCard from './components/ProductCard';
 import AdminPanel from './components/AdminPanel';
 import CartDrawer from './components/CartDrawer';
@@ -9,47 +9,28 @@ import CommunityLobby from './components/CommunityLobby';
 import DirectMessages from './components/DirectMessages';
 import { dbService } from './services/dbService';
 import { supabase, supabaseUrl } from './services/supabaseClient';
-import { ShoppingBag, Store, MessageCircle, UserPlus, Database, Key, CheckCircle, ExternalLink, Sparkles, Wifi, WifiOff } from 'lucide-react';
-
-const SIM_PROFILES: UserProfile[] = [
-  {
-    id: 'u1',
-    name: "Trin",
-    handle: "trinstreasures",
-    bio: "Aspiring Teen Boss! 💖",
-    avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Trin",
-    role: 'Daughter'
-  },
-  {
-    id: 'u2',
-    name: "Mom",
-    handle: "bossmom",
-    bio: "Supporting the hustle! 👑",
-    avatarUrl: "https://api.dicebear.com/7.x/avataaars/svg?seed=Mom",
-    role: 'Mother'
-  }
-];
+import { ShoppingBag, Store, MessageCircle, UserPlus, Database, Key, CheckCircle, ExternalLink, Sparkles, Wifi, WifiOff, Users, Briefcase, Heart } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
-  storeName: "Shop'reneur",
-  tagline: "Powered by Constructive Designs Inc.",
-  heroHeadline: "Launch Your Dream Shop!",
-  heroSubtext: "Curate your favorite items, build your brand, and turn your wishlist into a business.",
-  primaryColor: "#ec4899", 
-  secondaryColor: "#8b5cf6", 
-  backgroundColor: "#fdf2f8", 
+  storeName: "Shop'reneur Incubator",
+  tagline: "Constructive Designs Inc. Platform",
+  heroHeadline: "Build Your Digital Empire",
+  heroSubtext: "From wishlist to boutique, and then to the global marketplace.",
+  primaryColor: "#0f172a", 
+  secondaryColor: "#6366f1", 
+  backgroundColor: "#f8fafc", 
   fontHeading: 'Playfair Display',
-  fontBody: 'Inter',
-  amazonAffiliateTag: 'cdi-nonprofit-20'
+  fontBody: 'Inter'
 };
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<UserProfile>(SIM_PROFILES[0]);
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [shopSettings, setShopSettings] = useState<ShopSettings>(INITIAL_SETTINGS);
   const [products, setProducts] = useState<Product[]>([]);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [isDbConnected, setIsDbConnected] = useState(false);
-  const [showLaunchBanner, setShowLaunchBanner] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // UI State
   const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages'>('shop');
@@ -61,23 +42,20 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!isConfigured) return;
 
-    const productsChannel = dbService.subscribeToProducts((updatedProducts) => {
-      setProducts(updatedProducts);
+    const productsChannel = dbService.subscribeToProducts(setProducts);
+    const settingsChannel = dbService.subscribeToSettings(setShopSettings);
+    const messagesChannel = dbService.subscribeToMessages(setAllMessages);
+    const profilesChannel = dbService.subscribeToProfiles((p) => {
+      setProfiles(p);
       setIsDbConnected(true);
-    });
-
-    const settingsChannel = dbService.subscribeToSettings((updatedSettings) => {
-      setShopSettings(updatedSettings);
-    });
-
-    const messagesChannel = dbService.subscribeToMessages((updatedMessages) => {
-      setAllMessages(updatedMessages);
+      setIsInitialized(true);
     });
 
     return () => {
       productsChannel.unsubscribe();
       settingsChannel.unsubscribe();
       messagesChannel.unsubscribe();
+      profilesChannel.unsubscribe();
     };
   }, [isConfigured]);
 
@@ -87,85 +65,109 @@ const App: React.FC = () => {
     document.documentElement.style.setProperty('--color-background', shopSettings.backgroundColor);
     document.documentElement.style.setProperty('--font-heading', shopSettings.fontHeading);
     document.documentElement.style.setProperty('--font-body', shopSettings.fontBody);
-    document.title = `${shopSettings.storeName} | Shop'reneur`;
+    document.title = `${shopSettings.storeName}`;
   }, [shopSettings]);
 
-  const handleSwitchUser = () => {
-    const nextIndex = (SIM_PROFILES.findIndex(p => p.id === currentUser.id) + 1) % SIM_PROFILES.length;
-    setCurrentUser(SIM_PROFILES[nextIndex]);
+  const handleCreateProfile = async (name: string, role: any) => {
+    const handle = name.toLowerCase().replace(/\s/g, '_') + Math.floor(Math.random() * 100);
+    const newProfile: Partial<UserProfile> = {
+      name,
+      handle,
+      role,
+      bio: `Member of the ${shopSettings.storeName} community.`,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
+    };
+    await dbService.upsertProfile(newProfile);
+    const updated = await dbService.getProfiles();
+    const created = updated.find(p => p.handle === handle);
+    if (created) setCurrentUser(created);
   };
 
   const handleSendMessage = async (text: string, recipientId: string) => {
+    if (!currentUser) return;
     await dbService.sendMessage({ senderId: currentUser.id, recipientId: recipientId, text, timestamp: Date.now() });
   };
 
-  const handleDeleteMessage = async (messageId: string) => {
-    await dbService.deleteMessage(messageId);
-  };
-
-  const handleUpdateShopSettings = async (newSettings: ShopSettings) => {
-    await dbService.updateSettings(newSettings);
-  };
-
-  const handleAddProduct = async (newProducts: Product | Product[]) => {
-    const productsToAdd = Array.isArray(newProducts) ? newProducts : [newProducts];
-    for (const p of productsToAdd) {
-      await dbService.saveProduct(p);
+  const handleSyncToMarketplace = async (productId: string) => {
+    const p = products.find(prod => prod.id === productId);
+    if (p) {
+      await dbService.saveProduct({ ...p, isMarketplaceSynced: true });
+      alert("Promoted to Constructive Marketplace! 🚀");
     }
   };
 
-  const handlePurchaseComplete = async (itemIds: string[]) => {
-    for (const id of itemIds) {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        await dbService.saveProduct({
-          ...product,
-          isReceived: true,
-          stockCount: (product.stockCount || 0) + 1
-        });
+  // Fix: Added handleUpdateShopSettings to resolve compilation error
+  const handleUpdateShopSettings = async (settings: ShopSettings) => {
+    try {
+      await dbService.updateSettings(settings);
+      setShopSettings(settings);
+    } catch (error) {
+      console.error("Failed to update settings:", error);
+    }
+  };
+
+  // Fix: Added handleAddProduct to resolve compilation error
+  const handleAddProduct = async (product: Product | Product[]) => {
+    try {
+      const prods = Array.isArray(product) ? product : [product];
+      for (const p of prods) {
+        await dbService.saveProduct(p);
       }
+    } catch (error) {
+      console.error("Failed to add product:", error);
     }
-    setCart([]);
   };
 
   if (!isConfigured) {
     return (
-      <div className="min-h-screen bg-[#fdf2f8] flex flex-col items-center justify-center p-6 font-sans">
-        <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-10 border border-pink-100 text-center space-y-8 animate-fadeIn">
-          <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto">
-            <Database size={40} className="text-pink-600" />
-          </div>
-          
-          <div className="space-y-2">
-            <h1 className="text-3xl font-display font-bold text-gray-900">Final Step: Connection 🔌</h1>
-            <p className="text-gray-500 text-sm">You are so close! We just need to connect the app to your database keys.</p>
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-8">
+          <Database size={40} className="mx-auto text-indigo-600" />
+          <h1 className="text-3xl font-display font-bold">Connect to Organization Cloud</h1>
+          <p className="text-slate-500">Please provide your Supabase keys in <code>supabaseClient.ts</code> to begin.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!currentUser && isInitialized) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6">
+        <div className="max-w-2xl w-full bg-white rounded-[2.5rem] shadow-2xl p-12 text-center space-y-10 border border-slate-100">
+          <div className="space-y-4">
+             <div className="bg-indigo-600 w-20 h-20 rounded-2xl flex items-center justify-center mx-auto text-white shadow-xl shadow-indigo-200">
+                <Briefcase size={40} />
+             </div>
+             <h1 className="text-4xl font-display font-bold text-slate-900 tracking-tight">Welcome to the Org Portal</h1>
+             <p className="text-slate-500 text-lg">Who is accessing the platform today?</p>
           </div>
 
-          <div className="space-y-4 text-left">
-            <div className="flex gap-4 items-start p-4 bg-gray-50 rounded-2xl border border-gray-100">
-               <div className="bg-green-100 text-green-600 p-2 rounded-lg mt-1"><CheckCircle size={18} /></div>
-               <div>
-                  <h3 className="font-bold text-gray-800 text-sm">Step 1: SQL Setup</h3>
-                  <p className="text-[11px] text-gray-500">Success! The database tables were created.</p>
-               </div>
-            </div>
-
-            <div className="flex gap-4 items-start p-4 bg-pink-50 rounded-2xl border border-pink-100 ring-2 ring-pink-200">
-               <div className="bg-pink-100 text-pink-600 p-2 rounded-lg mt-1"><Key size={18} /></div>
-               <div className="flex-1">
-                  <h3 className="font-bold text-pink-900 text-sm">Step 2: Save the Keys</h3>
-                  <p className="text-[11px] text-pink-700 leading-relaxed mb-3">
-                    Paste your **Project URL** and **Anon Key** into `services/supabaseClient.ts` in the file list on the left.
-                  </p>
-                  <a 
-                    href="https://supabase.com/dashboard" 
-                    target="_blank" 
-                    className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-pink-600 text-white px-3 py-1.5 rounded-full hover:bg-pink-700 transition-colors"
-                  >
-                    Open Supabase Dashboard <ExternalLink size={10} />
-                  </a>
-               </div>
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+            {profiles.map(p => (
+              <button 
+                key={p.id} 
+                onClick={() => setCurrentUser(p)}
+                className="flex items-center gap-4 p-5 rounded-3xl border border-slate-100 hover:border-indigo-500 hover:bg-indigo-50 transition-all group"
+              >
+                <img src={p.avatarUrl} className="w-12 h-12 rounded-full border-2 border-white shadow-sm" alt="" />
+                <div className="flex-1">
+                   <p className="font-bold text-slate-900 group-hover:text-indigo-600">{p.name}</p>
+                   <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{p.role}</p>
+                </div>
+              </button>
+            ))}
+            
+            <button 
+              onClick={() => {
+                const name = prompt("Enter your Name:");
+                const role = prompt("Your Role (Board Member, Daughter, Family Member, Sponsor):", "Member");
+                if (name) handleCreateProfile(name, role);
+              }}
+              className="flex items-center justify-center gap-2 p-5 rounded-3xl border-2 border-dashed border-slate-200 text-slate-400 font-bold hover:bg-slate-50 hover:text-indigo-500 hover:border-indigo-200 transition-all"
+            >
+              <UserPlus size={20} />
+              Add New Member
+            </button>
           </div>
         </div>
       </div>
@@ -174,97 +176,73 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col transition-all duration-500 bg-background font-sans">
-      {showLaunchBanner && (
-        <div className="bg-black text-white text-[10px] font-bold py-2 text-center flex items-center justify-center gap-2 tracking-widest uppercase">
-          <Sparkles size={12} className="text-yellow-400" /> 
-          Grand Opening: Welcome to your new Empire!
-          <button onClick={() => setShowLaunchBanner(false)} className="ml-4 opacity-50 hover:opacity-100">✕</button>
-        </div>
-      )}
-
-      <nav className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm px-6 h-20 flex justify-between items-center">
-        <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('shop')}>
-          <div className="bg-gradient-to-tr from-primary to-secondary text-white p-2 rounded-full shadow-lg shadow-primary/20">
-            <Store size={24} />
+      <nav className="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-100 px-6 h-20 flex justify-between items-center shadow-sm">
+        <div className="flex items-center gap-4 cursor-pointer" onClick={() => setActiveTab('shop')}>
+          <div className="bg-indigo-900 text-white p-2.5 rounded-xl">
+            <Briefcase size={22} />
           </div>
           <div>
-            <h1 className="text-xl font-bold font-display text-gray-900 leading-none tracking-tight">{shopSettings.storeName}</h1>
-            <p className="text-[9px] text-gray-500 font-bold uppercase tracking-widest mt-1 opacity-70">{shopSettings.tagline}</p>
+            <h1 className="text-lg font-bold font-display text-slate-900 leading-none">{shopSettings.storeName}</h1>
+            <p className="text-[9px] font-black text-indigo-500 uppercase tracking-widest mt-1">Org Platform v3.0</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 md:gap-6">
-          <div className="hidden md:flex items-center gap-6 mr-4 border-r border-gray-100 pr-6">
-            <button onClick={() => setActiveTab('shop')} className={`text-sm font-bold transition-colors ${activeTab === 'shop' ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>Shop</button>
-            <button onClick={() => setActiveTab('tryon')} className={`text-sm font-bold transition-colors ${activeTab === 'tryon' ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>Try-On</button>
-            <button onClick={() => setActiveTab('community')} className={`text-sm font-bold transition-colors ${activeTab === 'community' ? 'text-primary' : 'text-gray-400 hover:text-gray-600'}`}>Community</button>
+        <div className="flex items-center gap-4 md:gap-8">
+          <div className="hidden lg:flex items-center gap-8 mr-6">
+            <button onClick={() => setActiveTab('shop')} className={`text-sm font-bold ${activeTab === 'shop' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>The Hub</button>
+            <button onClick={() => setActiveTab('community')} className={`text-sm font-bold ${activeTab === 'community' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`}>Org Network</button>
           </div>
           
-          <button onClick={handleSwitchUser} className="text-[10px] bg-gray-50 border border-gray-100 px-3 py-2 rounded-full flex items-center gap-2 hover:bg-white transition-all shadow-sm">
-            <img src={currentUser.avatarUrl} className="w-5 h-5 rounded-full" alt="" />
-            <span className="font-bold text-gray-700 hidden sm:inline">{currentUser.name}</span>
-          </button>
-          
-          <button onClick={() => setActiveTab('messages')} className="relative p-2 text-gray-400 hover:text-primary transition-colors">
+          <div className="h-8 w-px bg-slate-100 mx-2"></div>
+
+          <button onClick={() => setActiveTab('messages')} className="relative p-2 text-slate-400 hover:text-indigo-600">
             <MessageCircle size={22} />
-            <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+            <span className="absolute top-1 right-1 w-2 h-2 bg-indigo-500 rounded-full"></span>
           </button>
           
-          <button onClick={() => setIsCartOpen(true)} className="relative p-2 text-gray-700 hover:text-primary">
-            <ShoppingBag size={22} />
-            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-primary text-white text-[9px] w-4 h-4 flex items-center justify-center rounded-full font-bold border-2 border-white">{cart.length}</span>}
-          </button>
+          <button onClick={() => setActiveTab('admin')} className="bg-indigo-950 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:bg-indigo-900 shadow-lg shadow-indigo-100">Portal</button>
           
-          <button onClick={() => setActiveTab('admin')} className="bg-black text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-gray-800 transition-all shadow-lg shadow-black/10">Admin</button>
+          <button onClick={() => setCurrentUser(null)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+            <Users size={18} />
+          </button>
         </div>
       </nav>
 
-      <main className="flex-1 max-w-7xl mx-auto px-4 md:px-6 py-8 w-full">
+      <main className="flex-1 max-w-7xl mx-auto px-6 py-10 w-full">
         {activeTab === 'shop' && (
           <div className="animate-fadeIn">
-            <div className="bg-gradient-to-br from-primary via-primary to-secondary rounded-[2.5rem] p-10 md:p-16 text-white shadow-2xl mb-12 relative overflow-hidden">
+            <div className="bg-slate-900 rounded-[3rem] p-12 md:p-20 text-white shadow-2xl mb-16 relative overflow-hidden">
                <div className="relative z-10">
-                  <span className="inline-block bg-white/20 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6">New Collection Live</span>
-                  <h2 className="text-4xl md:text-6xl font-display font-bold mb-4 tracking-tight leading-tight">{shopSettings.heroHeadline}</h2>
-                  <p className="text-base md:text-lg opacity-90 max-w-xl font-medium leading-relaxed">{shopSettings.heroSubtext}</p>
+                  <span className="inline-block bg-white/10 backdrop-blur-lg px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest mb-8 border border-white/10 text-indigo-300">Incubator Active</span>
+                  <h2 className="text-5xl md:text-7xl font-display font-bold mb-6 tracking-tight leading-tight">{shopSettings.heroHeadline}</h2>
+                  <p className="text-xl opacity-70 max-w-2xl font-light leading-relaxed">{shopSettings.heroSubtext}</p>
                </div>
-               <div className="absolute top-0 right-0 p-20 opacity-20 transform translate-x-20 -translate-y-10">
-                  <Store size={300} />
+               <div className="absolute -right-20 -bottom-20 opacity-10">
+                  <Store size={500} />
                </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
               {products.map(p => (
                 <ProductCard 
                   key={p.id} 
                   product={p} 
-                  userRole={currentUser.role === 'Daughter' ? 'admin' : 'shopper'} 
+                  userRole={currentUser?.role === 'Daughter' ? 'admin' : 'shopper'} 
                   onDelete={dbService.deleteProduct}
                   onAddToCart={(p, type) => setCart([...cart, { ...p, quantity: 1, orderType: type }])} 
                 />
               ))}
-              {products.length === 0 && (
-                <div className="col-span-full py-32 text-center space-y-4 bg-white/50 rounded-[2rem] border-2 border-dashed border-gray-100">
-                  <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto text-gray-300">
-                    <ShoppingBag size={32} />
-                  </div>
-                  <div className="space-y-1">
-                    <p className="text-gray-600 font-bold text-lg">Your boutique is empty!</p>
-                    <p className="text-gray-400 text-sm">Head to the Admin panel to stock your first item.</p>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}
         
-        {activeTab === 'messages' && (
+        {activeTab === 'messages' && currentUser && (
           <DirectMessages 
             currentUser={currentUser} 
             allMessages={allMessages} 
             onSendMessage={handleSendMessage} 
-            onDeleteMessage={handleDeleteMessage}
-            otherProfiles={SIM_PROFILES.filter(p => p.id !== currentUser.id)}
+            onDeleteMessage={dbService.deleteMessage}
+            otherProfiles={profiles.filter(p => p.id !== currentUser.id)}
           />
         )}
 
@@ -274,14 +252,16 @@ const App: React.FC = () => {
             onUpdateShopSettings={handleUpdateShopSettings} 
             onAddProduct={handleAddProduct} 
             products={products}
-            creatorStats={{tier: 'Starter', streak: 1, points: 100, level: 'Rising Star', videosPostedThisWeek: 0, weeklyGoal: 1, nextLevelPoints: 500, subscriptionPlan: 'Free', inventoryCount: products.length}}
+            // Fix: Added subscriptionPlan to CreatorStats to resolve type error
+            creatorStats={{tier: 'Starter', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}}
             onCompleteChallenge={() => {}}
             dbConnected={isDbConnected}
+            onSyncMarketplace={handleSyncToMarketplace}
           />
         )}
 
-        {activeTab === 'tryon' && <VirtualTryOn products={products} />}
-        {activeTab === 'community' && <CommunityLobby creatorStats={{tier: 'Starter', streak: 1, points: 100, level: 'Rising Star', videosPostedThisWeek: 0, weeklyGoal: 1, nextLevelPoints: 500, subscriptionPlan: 'Free', inventoryCount: products.length}} onVote={() => {}} />}
+        {/* Fix: Added subscriptionPlan to CreatorStats to resolve type error */}
+        {activeTab === 'community' && <CommunityLobby creatorStats={{tier: 'Starter', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onVote={() => {}} />}
       </main>
 
       <CartDrawer 
@@ -290,28 +270,23 @@ const App: React.FC = () => {
         cartItems={cart} 
         onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} 
         shopSettings={shopSettings} 
-        userProfile={currentUser} 
-        onPurchaseComplete={handlePurchaseComplete} 
+        userProfile={currentUser || undefined} 
+        onPurchaseComplete={(ids) => {
+            ids.forEach(async id => {
+                const p = products.find(prod => prod.id === id);
+                if(p) await dbService.saveProduct({...p, isReceived: true, stockCount: (p.stockCount || 0) + 1});
+            });
+            setCart([]);
+        }} 
       />
 
-      <footer className="bg-white/40 border-t border-gray-100 py-12 px-8 flex flex-col items-center gap-4 text-center">
-        <div className="flex items-center gap-3">
-           <div className="h-px w-12 bg-gray-200"></div>
-           <h2 className="text-sm font-bold text-gray-400 font-display italic tracking-widest">{shopSettings.storeName}</h2>
-           <div className="h-px w-12 bg-gray-200"></div>
-        </div>
-        
+      <footer className="bg-white border-t border-slate-100 py-16 px-8 flex flex-col items-center gap-6">
         <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border transition-all ${isDbConnected ? 'bg-green-50 text-green-600 border-green-200' : 'bg-red-50 text-red-500 border-red-200'}`}>
-             {isDbConnected ? <Wifi size={10} /> : <WifiOff size={10} />}
-             {isDbConnected ? 'Live System Online' : 'Cloud Offline'}
+          <div className={` px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all ${isDbConnected ? 'bg-green-50 text-green-600 border-green-100' : 'bg-red-50 text-red-500 border-red-100'}`}>
+             {isDbConnected ? '🟢 Platform Sync Active' : '🔴 Sync Interrupted'}
           </div>
-          <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">v2.0 PROD</span>
         </div>
-        
-        <p className="text-[10px] text-gray-400 max-w-xs font-medium">
-          The ultimate platform for teen entrepreneurs to build their empire. Launching hearts and minds since 2025.
-        </p>
+        <p className="text-[11px] text-slate-400 font-medium tracking-tight">© 2025 Constructive Designs Inc. Professional Incubator Series.</p>
       </footer>
     </div>
   );

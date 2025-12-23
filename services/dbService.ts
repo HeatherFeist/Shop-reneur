@@ -1,10 +1,7 @@
 
 import { supabase } from "./supabaseClient";
-import { Product, ShopSettings, Message } from "../types";
+import { Product, ShopSettings, Message, UserProfile } from "../types";
 
-/**
- * Maps Database snake_case (SQL) to Frontend camelCase (TypeScript)
- */
 const mapProduct = (p: any): Product => ({
   id: p.id,
   name: p.name,
@@ -19,44 +16,61 @@ const mapProduct = (p: any): Product => ({
   platform: p.platform,
   isWishlist: p.is_wishlist,
   isReceived: p.is_received,
-  stockCount: p.stock_count
+  stockCount: p.stock_count,
+  isMarketplaceSynced: p.is_marketplace_synced || false
 });
 
-const mapSettings = (s: any): ShopSettings => ({
-  storeName: s.store_name,
-  tagline: s.tagline,
-  heroHeadline: s.hero_headline,
-  heroSubtext: s.hero_subtext,
-  primaryColor: s.primary_color,
-  secondaryColor: s.secondary_color,
-  backgroundColor: s.background_color,
-  fontHeading: s.font_heading,
-  fontBody: s.font_body,
-  amazonAffiliateTag: s.amazon_affiliate_tag
+const mapProfile = (p: any): UserProfile => ({
+  id: p.id,
+  name: p.name,
+  handle: p.handle,
+  bio: p.bio,
+  avatarUrl: p.avatar_url,
+  role: p.role
 });
 
 export const dbService = {
+  // --- Profiles ---
+  getProfiles: async (): Promise<UserProfile[]> => {
+    const { data } = await supabase.from('profiles').select('*');
+    return (data || []).map(mapProfile);
+  },
+
+  subscribeToProfiles: (callback: (profiles: UserProfile[]) => void) => {
+    supabase.from('profiles').select('*').then(({ data }) => {
+      if (data) callback(data.map(mapProfile));
+    });
+
+    return supabase.channel('profiles-realtime')
+      .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'profiles' }, async () => {
+        const { data } = await supabase.from('profiles').select('*');
+        if (data) callback(data.map(mapProfile));
+      })
+      .subscribe();
+  },
+
+  upsertProfile: async (profile: Partial<UserProfile>) => {
+    const { error } = await supabase.from('profiles').upsert({
+      id: profile.id || undefined,
+      name: profile.name,
+      handle: profile.handle,
+      bio: profile.bio,
+      avatar_url: profile.avatarUrl,
+      role: profile.role
+    });
+    if (error) throw error;
+  },
+
   // --- Products ---
   subscribeToProducts: (callback: (products: Product[]) => void) => {
-    // Initial fetch
-    supabase.from('products')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
-        if (error) console.error("Error fetching initial products:", error);
-        if (data) callback(data.map(mapProduct));
-      });
+    supabase.from('products').select('*').order('created_at', { ascending: false })
+      .then(({ data }) => { if (data) callback(data.map(mapProduct)); });
 
-    // Real-time listener
-    // Fix: Explicitly include 'schema' and cast event type to 'any' to bypass strict overload resolution errors
-    const channel = supabase.channel('products-realtime')
+    return supabase.channel('products-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'products' }, async () => {
         const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
         if (data) callback(data.map(mapProduct));
-      })
-      .subscribe();
-      
-    return channel;
+      }).subscribe();
   },
 
   saveProduct: async (product: Partial<Product>) => {
@@ -74,46 +88,56 @@ export const dbService = {
       is_wishlist: product.isWishlist,
       is_received: product.isReceived,
       stock_count: product.stockCount,
+      is_marketplace_synced: product.isMarketplaceSynced,
       updated_at: new Date()
     };
-
-    if (product.id) {
-      const { error } = await supabase.from('products').update(dbPayload).eq('id', product.id);
-      if (error) throw error;
-    } else {
-      const { error } = await supabase.from('products').insert([dbPayload]);
-      if (error) throw error;
-    }
+    const { error } = product.id 
+      ? await supabase.from('products').update(dbPayload).eq('id', product.id)
+      : await supabase.from('products').insert([dbPayload]);
+    if (error) throw error;
   },
 
   deleteProduct: async (productId: string) => {
-    const { error } = await supabase.from('products').delete().eq('id', productId);
-    if (error) throw error;
+    await supabase.from('products').delete().eq('id', productId);
   },
 
   // --- Settings ---
   subscribeToSettings: (callback: (settings: ShopSettings) => void) => {
-    supabase.from('shop_settings')
-      .select('*')
-      .eq('id', 'global_settings')
-      .single()
-      .then(({ data }) => {
-        if (data) callback(mapSettings(data));
-      });
+    supabase.from('shop_settings').select('*').eq('id', 'global_settings').single()
+      .then(({ data }) => { if (data) callback({
+        storeName: data.store_name,
+        tagline: data.tagline,
+        heroHeadline: data.hero_headline,
+        heroSubtext: data.hero_subtext,
+        primaryColor: data.primary_color,
+        secondaryColor: data.secondary_color,
+        backgroundColor: data.background_color,
+        fontHeading: data.font_heading,
+        fontBody: data.font_body,
+        amazonAffiliateTag: data.amazon_affiliate_tag
+      }); });
 
-    // Fix: Explicitly include 'schema' and cast event type to 'any' to bypass strict overload resolution errors
-    const channel = supabase.channel('settings-realtime')
+    return supabase.channel('settings-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'shop_settings' }, async () => {
         const { data } = await supabase.from('shop_settings').select('*').eq('id', 'global_settings').single();
-        if (data) callback(mapSettings(data));
-      })
-      .subscribe();
-
-    return channel;
+        if (data) callback({
+          storeName: data.store_name,
+          tagline: data.tagline,
+          heroHeadline: data.hero_headline,
+          heroSubtext: data.hero_subtext,
+          primaryColor: data.primary_color,
+          secondaryColor: data.secondary_color,
+          backgroundColor: data.background_color,
+          fontHeading: data.font_heading,
+          fontBody: data.font_body,
+          amazonAffiliateTag: data.amazon_affiliate_tag
+        });
+      }).subscribe();
   },
 
   updateSettings: async (settings: ShopSettings) => {
-    const dbPayload = {
+    await supabase.from('shop_settings').upsert({
+      id: 'global_settings',
       store_name: settings.storeName,
       tagline: settings.tagline,
       hero_headline: settings.heroHeadline,
@@ -125,28 +149,21 @@ export const dbService = {
       font_body: settings.fontBody,
       amazon_affiliate_tag: settings.amazonAffiliateTag,
       updated_at: new Date()
-    };
-    const { error } = await supabase.from('shop_settings').upsert({ id: 'global_settings', ...dbPayload });
-    if (error) throw error;
+    });
   },
 
   // --- Messages ---
   subscribeToMessages: (callback: (messages: Message[]) => void) => {
-    supabase.from('messages')
-      .select('*')
-      .order('timestamp', { ascending: true })
-      .then(({ data }) => {
-        if (data) callback(data.map((m: any) => ({
-          id: m.id,
-          senderId: m.sender_id,
-          recipientId: m.recipient_id,
-          text: m.text,
-          timestamp: m.timestamp
-        })));
-      });
+    supabase.from('messages').select('*').order('timestamp', { ascending: true })
+      .then(({ data }) => { if (data) callback(data.map((m: any) => ({
+        id: m.id,
+        senderId: m.sender_id,
+        recipientId: m.recipient_id,
+        text: m.text,
+        timestamp: m.timestamp
+      }))); });
 
-    // Fix: Explicitly include 'schema' and cast event type to 'any' to bypass strict overload resolution errors
-    const channel = supabase.channel('messages-realtime')
+    return supabase.channel('messages-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'messages' }, async () => {
         const { data } = await supabase.from('messages').select('*').order('timestamp', { ascending: true });
         if (data) callback(data.map((m: any) => ({
@@ -156,24 +173,19 @@ export const dbService = {
           text: m.text,
           timestamp: m.timestamp
         })));
-      })
-      .subscribe();
-
-    return channel;
+      }).subscribe();
   },
 
   sendMessage: async (message: Omit<Message, 'id'>) => {
-    const { error } = await supabase.from('messages').insert([{
+    await supabase.from('messages').insert([{
       sender_id: message.senderId,
       recipient_id: message.recipientId,
       text: message.text,
       timestamp: message.timestamp
     }]);
-    if (error) throw error;
   },
 
   deleteMessage: async (messageId: string) => {
-    const { error } = await supabase.from('messages').delete().eq('id', messageId);
-    if (error) throw error;
+    await supabase.from('messages').delete().eq('id', messageId);
   }
 };

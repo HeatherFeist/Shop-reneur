@@ -4,7 +4,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Shop'reneur</title>
+    <title>Shop'reneur | Professional Incubator</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -13,9 +13,7 @@
             colors: {
               primary: 'var(--color-primary)', 
               secondary: 'var(--color-secondary)',
-              accent: '#14b8a6', 
               background: 'var(--color-background)',
-              surface: '#ffffff',
             },
             fontFamily: {
               sans: ['var(--font-body)', 'sans-serif'],
@@ -25,23 +23,39 @@
         }
       }
     </script>
-    <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&family=Bebas+Neue&family=Dancing+Script:wght@400;700&family=Inter:wght@300;400;600&family=Lato:wght@400;700&family=Lobster&family=Merriweather:wght@300;400;700&family=Montserrat:wght@400;700&family=Open+Sans:wght@400;600&family=Oswald:wght@500&family=Playfair+Display:wght@700&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
     <style>
-      body {
-        font-family: var(--font-body), sans-serif;
-        background-color: var(--color-background);
-        color: #1f2937;
-      }
-      h1, h2, h3, h4, h5, h6 {
-        font-family: var(--font-heading), serif;
-      }
       :root {
-        --color-primary: #ec4899;
+        --color-primary: #6366f1;
         --color-secondary: #8b5cf6;
-        --color-background: #fdf2f8;
+        --color-background: #020617;
         --font-heading: 'Playfair Display';
         --font-body: 'Inter';
       }
+      body {
+        font-family: var(--font-body), sans-serif;
+        background-color: var(--color-background);
+        color: #f1f5f9;
+        margin: 0;
+        -webkit-font-smoothing: antialiased;
+      }
+      .glass-card {
+        background: rgba(255, 255, 255, 0.03);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+      .glass-nav {
+        background: rgba(2, 6, 23, 0.7);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      }
+      ::-webkit-scrollbar { width: 6px; }
+      ::-webkit-scrollbar-track { background: #020617; }
+      ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
   <script type="importmap">
 {

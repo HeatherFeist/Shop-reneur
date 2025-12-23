@@ -1,6 +1,4 @@
 
-// Types for the Shop'reneur Platform
-
 export interface ShippingAddress {
   street: string;
   city: string;
@@ -24,8 +22,8 @@ export interface Product {
   isWishlist: boolean; 
   isReceived?: boolean; 
   stockCount?: number; 
-  isMarketplaceSynced?: boolean; // Track if pushed to the main platform
-  asin?: string; // Amazon Standard Identification Number for batch checkout
+  isMarketplaceSynced?: boolean; 
+  asin?: string; 
 }
 
 export enum ProductCategory {
@@ -96,6 +94,10 @@ export interface SocialPost {
   taggedUsers?: string[];
 }
 
+/**
+ * Interface for AI-generated business challenges/content prompts
+ * Used by the Business Mentor to guide teen entrepreneurs
+ */
 export interface ContentPrompt {
   title: string;
   description: string;
@@ -103,11 +105,4 @@ export interface ContentPrompt {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   xpReward: number;
   sources?: string[];
-}
-
-export interface SaleRecord {
-  id: string;
-  productId: string;
-  amount: number;
-  timestamp: number;
 }

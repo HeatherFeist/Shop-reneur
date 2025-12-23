@@ -8,7 +8,9 @@ import VirtualTryOn from './components/VirtualTryOn';
 import CommunityLobby from './components/CommunityLobby';
 import DirectMessages from './components/DirectMessages';
 import { dbService } from './services/dbService';
-import { ShoppingBag, Store, LogOut, MessageCircle, UserPlus, Smartphone } from 'lucide-react';
+// Import supabaseUrl directly as it is protected on the supabase client instance
+import { supabase, supabaseUrl } from './services/supabaseClient';
+import { ShoppingBag, Store, LogOut, MessageCircle, UserPlus, Smartphone, Database, Key, CheckCircle, ArrowRight, ExternalLink } from 'lucide-react';
 
 const SIM_PROFILES: UserProfile[] = [
   {
@@ -47,17 +49,23 @@ const App: React.FC = () => {
   const [shopSettings, setShopSettings] = useState<ShopSettings>(INITIAL_SETTINGS);
   const [products, setProducts] = useState<Product[]>([]);
   const [allMessages, setAllMessages] = useState<Message[]>([]);
+  const [isDbConnected, setIsDbConnected] = useState(false);
 
   // UI State
   const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages'>('shop');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // --- Real-time Supabase Subscriptions ---
+  // Check if Supabase is configured using the exported constant instead of protected property access
+  const isConfigured = !supabaseUrl.includes("your-project-id");
+
   useEffect(() => {
+    if (!isConfigured) return;
+
     // 1. Listen for Product changes
     const productsChannel = dbService.subscribeToProducts((updatedProducts) => {
       setProducts(updatedProducts);
+      setIsDbConnected(true);
     });
 
     // 2. Listen for Shop Settings changes
@@ -71,12 +79,11 @@ const App: React.FC = () => {
     });
 
     return () => {
-      // In Supabase client, we unsubscribe from the channels
       productsChannel.unsubscribe();
       settingsChannel.unsubscribe();
       messagesChannel.unsubscribe();
     };
-  }, []);
+  }, [isConfigured]);
 
   // CSS Variable Sync
   useEffect(() => {
@@ -88,19 +95,13 @@ const App: React.FC = () => {
     document.title = `${shopSettings.storeName} | Shop'reneur`;
   }, [shopSettings]);
 
-  // --- Handlers ---
   const handleSwitchUser = () => {
     const nextIndex = (SIM_PROFILES.findIndex(p => p.id === currentUser.id) + 1) % SIM_PROFILES.length;
     setCurrentUser(SIM_PROFILES[nextIndex]);
   };
 
   const handleSendMessage = async (text: string, recipientId: string) => {
-    await dbService.sendMessage({
-      senderId: currentUser.id,
-      recipientId: recipientId,
-      text: text,
-      timestamp: Date.now()
-    });
+    await dbService.sendMessage({ senderId: currentUser.id, recipientId: recipientId, text, timestamp: Date.now() });
   };
 
   const handleDeleteMessage = async (messageId: string) => {
@@ -131,6 +132,54 @@ const App: React.FC = () => {
     }
     setCart([]);
   };
+
+  if (!isConfigured) {
+    return (
+      <div className="min-h-screen bg-[#fdf2f8] flex flex-col items-center justify-center p-6 font-sans">
+        <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-10 border border-pink-100 text-center space-y-8 animate-fadeIn">
+          <div className="w-20 h-20 bg-pink-100 rounded-full flex items-center justify-center mx-auto">
+            <Database size={40} className="text-pink-600" />
+          </div>
+          
+          <div className="space-y-2">
+            <h1 className="text-3xl font-display font-bold text-gray-900">Almost There! ✨</h1>
+            <p className="text-gray-500">You've successfully set up the database structure. Now, we just need to tell the app where it is.</p>
+          </div>
+
+          <div className="space-y-4 text-left">
+            <div className="flex gap-4 items-start p-4 bg-gray-50 rounded-2xl border border-gray-100">
+               <div className="bg-green-100 text-green-600 p-2 rounded-lg mt-1"><CheckCircle size={18} /></div>
+               <div>
+                  <h3 className="font-bold text-gray-800 text-sm">Step 1: SQL Schema</h3>
+                  <p className="text-xs text-gray-500">You already did this! The tables are ready.</p>
+               </div>
+            </div>
+
+            <div className="flex gap-4 items-start p-4 bg-pink-50 rounded-2xl border border-pink-100 ring-2 ring-pink-200">
+               <div className="bg-pink-100 text-pink-600 p-2 rounded-lg mt-1"><Key size={18} /></div>
+               <div className="flex-1">
+                  <h3 className="font-bold text-pink-900 text-sm">Step 2: Connect the App</h3>
+                  <p className="text-xs text-pink-700 leading-relaxed mb-3">
+                    Go to **Settings > API** in Supabase. Copy your **Project URL** and **anon public key**, and paste them into the <code>services/supabaseClient.ts</code> file in this editor.
+                  </p>
+                  <a 
+                    href="https://supabase.com/dashboard" 
+                    target="_blank" 
+                    className="inline-flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest bg-pink-600 text-white px-3 py-1.5 rounded-full hover:bg-pink-700 transition-colors"
+                  >
+                    Open Supabase Dashboard <ExternalLink size={10} />
+                  </a>
+               </div>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-gray-100 text-xs text-gray-400">
+             Once you paste the keys and save that file, your shop will automatically spring to life!
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col transition-all duration-500 bg-background">
@@ -183,7 +232,14 @@ const App: React.FC = () => {
                   onAddToCart={(p, type) => setCart([...cart, { ...p, quantity: 1, orderType: type }])} 
                 />
               ))}
-              {products.length === 0 && <div className="col-span-full py-20 text-center text-gray-400">Shop is empty. Connect Supabase and run the SQL schema!</div>}
+              {products.length === 0 && (
+                <div className="col-span-full py-20 text-center space-y-4">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto text-gray-400">
+                    <ShoppingBag size={32} />
+                  </div>
+                  <p className="text-gray-400 font-medium">Your boutique is empty! Go to Admin to add your first find.</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -206,6 +262,7 @@ const App: React.FC = () => {
             products={products}
             creatorStats={{tier: 'Starter', streak: 0, points: 0, level: 'Newbie', videosPostedThisWeek: 0, weeklyGoal: 1, nextLevelPoints: 500, subscriptionPlan: 'Free', inventoryCount: 0}}
             onCompleteChallenge={() => {}}
+            dbConnected={isDbConnected}
           />
         )}
 
@@ -224,7 +281,7 @@ const App: React.FC = () => {
       />
 
       <footer className="bg-white/50 border-t border-gray-100 p-8 text-center text-sm text-gray-500 font-sans">
-        <p>© 2025 {shopSettings.storeName}. Real-time Supabase Sync Active.</p>
+        <p>© 2025 {shopSettings.storeName}. {isDbConnected ? '🟢 Cloud Sync Active' : '🔴 Connection Pending'}</p>
       </footer>
     </div>
   );

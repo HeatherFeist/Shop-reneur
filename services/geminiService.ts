@@ -9,7 +9,7 @@ export const generateProductDescription = async (
   keywords: string
 ): Promise<string> => {
   try {
-    // Updated to gemini-3-flash-preview for basic text generation tasks
+    // gemini-3-flash-preview for basic text tasks
     const modelName = 'gemini-3-flash-preview';
     const prompt = `
       You are a trendy, Gen Z savvy copywriter for a teenage girl's online boutique on the "Shop'reneur" platform.
@@ -43,7 +43,7 @@ export const generateProductImage = async (
     Style: High-end e-commerce, clean white or pastel background, studio lighting, 4k, detailed. 
     Ensure the item is the main focus and fully visible. No text overlays.`;
 
-    // gemini-2.5-flash-image is correct for general image generation
+    // gemini-2.5-flash-image for image generation
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -73,7 +73,7 @@ export const generateTryOnImage = async (
     // Clean base64 string if it contains the data URL prefix
     const cleanBase64 = userImageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
 
-    // gemini-2.5-flash-image is used for image editing tasks
+    // gemini-2.5-flash-image for image editing
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
@@ -102,7 +102,7 @@ export const generateTryOnImage = async (
       },
     });
 
-    // Extract image from response
+    // Extract image from response parts
     for (const part of response.candidates?.[0]?.content?.parts || []) {
       if (part.inlineData) {
         return `data:image/png;base64,${part.inlineData.data}`;
@@ -134,7 +134,7 @@ export const searchTrendingProducts = async (query: string): Promise<any[]> => {
       ]
     `;
 
-    // gemini-3-flash-preview for structured text tasks
+    // gemini-3-flash-preview for structured JSON output
     const response = await ai.models.generateContent({
       model: 'gemini-3-flash-preview',
       contents: prompt,
@@ -150,7 +150,9 @@ export const searchTrendingProducts = async (query: string): Promise<any[]> => {
               category: { type: Type.STRING },
               description: { type: Type.STRING },
               keywords: { type: Type.STRING },
-            }
+            },
+            required: ["name", "price", "category", "description", "keywords"],
+            propertyOrdering: ["name", "price", "category", "description", "keywords"]
           }
         }
       }
@@ -168,7 +170,7 @@ export const searchTrendingProducts = async (query: string): Promise<any[]> => {
 // --- Business Mentor Functions ---
 
 export const getBusinessMentorChat = () => {
-  // gemini-3-flash-preview for interactive chat
+  // gemini-3-flash-preview for conversational AI
   return ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: {
@@ -202,50 +204,55 @@ export const scanTrendsAndGenerateChallenges = async () => {
       ]
     `;
 
-    // gemini-3-pro-preview for complex reasoning task with search grounding
+    // gemini-3-pro-preview for tasks requiring search grounding.
+    // Rule: We MUST extract URLs from groundingChunks and list them. 
+    // Rule: Output text may not be pure JSON when using search grounding, so we remove responseMimeType and handle parsing manually.
     const response = await ai.models.generateContent({
       model: 'gemini-3-pro-preview',
       contents: prompt,
       config: {
         tools: [{ googleSearch: {} }],
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: {
-              title: { type: Type.STRING },
-              description: { type: Type.STRING },
-              platform: { type: Type.STRING },
-              difficulty: { type: Type.STRING },
-              xpReward: { type: Type.NUMBER },
-            }
-          }
-        }
       }
     });
+
+    // Extract grounding URLs as required by guidelines
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const sources = groundingChunks?.map((chunk: any) => chunk.web?.uri).filter(Boolean) || [];
 
     const text = response.text;
     if (!text) return [];
     
-    return JSON.parse(text);
+    try {
+      // Find JSON block within the response text as search grounding can include extra text
+      const jsonMatch = text.match(/\[[\s\S]*\]/);
+      const jsonStr = jsonMatch ? jsonMatch[0] : text;
+      const challenges = JSON.parse(jsonStr);
+      
+      // Inject source URLs into the challenges for the UI to display
+      return challenges.map((c: any) => ({ ...c, sources }));
+    } catch (e) {
+      console.warn("Could not parse JSON from search grounding response:", text);
+      return [];
+    }
   } catch (error) {
     console.error("Error scanning trends:", error);
-    // Fallback data if search fails or hits limits
+    // Fallback static data
     return [
       {
         title: "GRWM: School Fit",
         description: "Get Ready With Me videos are trending. Show a outfit combo from your shop!",
         platform: "TikTok",
         difficulty: "Easy",
-        xpReward: 150
+        xpReward: 150,
+        sources: []
       },
       {
         title: "ASMR Unboxing",
         description: "Satisfying unboxing videos are viral. Film a silent unboxing of your best seller.",
         platform: "Instagram",
         difficulty: "Medium",
-        xpReward: 300
+        xpReward: 300,
+        sources: []
       }
     ];
   }

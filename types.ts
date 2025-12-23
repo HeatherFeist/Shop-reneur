@@ -1,3 +1,4 @@
+
 export interface Product {
   id: string; // UUID from Supabase
   name: string;
@@ -77,6 +78,7 @@ export interface ContentPrompt {
   xpReward: number;
   platform: SocialPlatform;
   expiresIn?: string; 
+  sources?: string[]; // Added to comply with search grounding rules
 }
 
 export interface ShopSettings {

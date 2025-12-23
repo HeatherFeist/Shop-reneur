@@ -53,27 +53,28 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
 
-  // --- Real-time Firebase Subscriptions ---
+  // --- Real-time Supabase Subscriptions ---
   useEffect(() => {
     // 1. Listen for Product changes
-    const unsubProducts = dbService.subscribeToProducts((updatedProducts) => {
+    const productsChannel = dbService.subscribeToProducts((updatedProducts) => {
       setProducts(updatedProducts);
     });
 
     // 2. Listen for Shop Settings changes
-    const unsubSettings = dbService.subscribeToSettings((updatedSettings) => {
+    const settingsChannel = dbService.subscribeToSettings((updatedSettings) => {
       setShopSettings(updatedSettings);
     });
 
     // 3. Listen for Messages
-    const unsubMessages = dbService.subscribeToMessages((updatedMessages) => {
+    const messagesChannel = dbService.subscribeToMessages((updatedMessages) => {
       setAllMessages(updatedMessages);
     });
 
     return () => {
-      unsubProducts();
-      unsubSettings();
-      unsubMessages();
+      // In Supabase client, we unsubscribe from the channels
+      productsChannel.unsubscribe();
+      settingsChannel.unsubscribe();
+      messagesChannel.unsubscribe();
     };
   }, []);
 
@@ -118,7 +119,6 @@ const App: React.FC = () => {
   };
 
   const handlePurchaseComplete = async (itemIds: string[]) => {
-    // Update inventory logic in Cloud
     for (const id of itemIds) {
       const product = products.find(p => p.id === id);
       if (product) {
@@ -183,7 +183,7 @@ const App: React.FC = () => {
                   onAddToCart={(p, type) => setCart([...cart, { ...p, quantity: 1, orderType: type }])} 
                 />
               ))}
-              {products.length === 0 && <div className="col-span-full py-20 text-center text-gray-400">Shop is empty. Use the Admin panel to sync from Firebase!</div>}
+              {products.length === 0 && <div className="col-span-full py-20 text-center text-gray-400">Shop is empty. Connect Supabase and run the SQL schema!</div>}
             </div>
           </div>
         )}
@@ -224,7 +224,7 @@ const App: React.FC = () => {
       />
 
       <footer className="bg-white/50 border-t border-gray-100 p-8 text-center text-sm text-gray-500 font-sans">
-        <p>© 2025 {shopSettings.storeName}. Real-time Cloud Sync Active.</p>
+        <p>© 2025 {shopSettings.storeName}. Real-time Supabase Sync Active.</p>
       </footer>
     </div>
   );

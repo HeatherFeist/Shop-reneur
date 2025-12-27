@@ -4,7 +4,7 @@ import { ProductCategory, Product, CreatorStats, ShopSettings } from '../types';
 import { generateProductDescription, generateProductImage } from '../services/geminiService';
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
-import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers } from 'lucide-react';
+import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter } from 'lucide-react';
 
 interface AdminPanelProps {
   onAddProduct: (product: Product | Product[]) => void;
@@ -74,8 +74,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormData({ name: '', price: '', costPrice: '', category: ProductCategory.FASHION, keywords: '', affiliateLink: '', platform: 'Amazon', description: '', imageUrl: '', additionalImages: [], videoUrl: '', isReceived: false, marketplaceId: '' });
   };
 
-  const canPushToMarketplace = creatorStats.level === 'Influencer' || creatorStats.level === 'Viral Icon' || creatorStats.level === 'Empire Builder';
-
   const getMarketplaceLabel = () => {
     switch(formData.platform) {
       case 'Amazon': return 'Amazon ASIN';
@@ -114,7 +112,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                <h3 className="text-4xl font-display font-bold text-white tracking-tight">Asset Onboarding</h3>
                <p className="text-slate-500 text-sm">Define strategic inventory across verified global marketplaces.</p>
              </div>
-             <BusinessTip title="Marketplace Strategy" content="Choosing the right platform is key. Shein is often best for fast fashion, while Amazon and eBay offer deeper logistics for tech and home goods." />
+             <BusinessTip title="Market Categorization" content="Assigning categories ensures products appear in the correct 'Aisles' on the public storefront." />
            </div>
            
            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -132,19 +130,34 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     </select>
                  </div>
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Asset Name</label>
-                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Product Title" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 transition-colors text-white font-medium" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Department</label>
+                    <select 
+                      value={formData.category} 
+                      onChange={e => setFormData({...formData, category: e.target.value as any})}
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white appearance-none"
+                    >
+                      {Object.values(ProductCategory).map(cat => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                    </select>
                  </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4">
                  <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Retail Target ($)</label>
-                    <input required type="number" step="0.01" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white" />
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Asset Name</label>
+                    <input required type="text" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} placeholder="Product Title" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white font-medium" />
                  </div>
-                 <div className="space-y-2">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">{getMarketplaceLabel()}</label>
-                    <input type="text" value={formData.marketplaceId} onChange={e => setFormData({...formData, marketplaceId: e.target.value})} placeholder="ID / SKU" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white font-mono" />
-                 </div>
+              </div>
+           </div>
+
+           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Retail Target ($)</label>
+                 <input required type="number" step="0.01" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} placeholder="0.00" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white" />
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">{getMarketplaceLabel()}</label>
+                 <input type="text" value={formData.marketplaceId} onChange={e => setFormData({...formData, marketplaceId: e.target.value})} placeholder="ID / SKU" className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white font-mono" />
               </div>
            </div>
 
@@ -176,7 +189,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
            </div>
 
            <button type="submit" className="w-full bg-white text-black py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-4 group">
-             <Database size={24} className="text-indigo-600" /> Commit to Organization Ledger
+             <Database size={24} className="text-indigo-600" /> Commit to Ledger
            </button>
         </form>
       )}
@@ -191,12 +204,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                   </h3>
                   <p className="text-slate-500 text-sm">Configure your family organization's affiliate signatures.</p>
                 </div>
-                <BusinessTip title="Multi-ID Strategy" content="Youth under 18 can often use Shein IDs. Adults should configure Amazon and eBay IDs to maximize revenue across all demographics." />
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                 <div className="space-y-4">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Organization Title</label>
+                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Enterprise Title</label>
                    <input 
                      type="text" 
                      value={settingsForm.storeName}
@@ -211,27 +223,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                      value={settingsForm.amazonAffiliateTag || ''}
                      onChange={e => setSettingsForm({...settingsForm, amazonAffiliateTag: e.target.value})}
                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-indigo-400 font-mono"
-                     placeholder="e.g. mom-biz-20"
-                   />
-                </div>
-                <div className="space-y-4">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">eBay Campaign ID</label>
-                   <input 
-                     type="text" 
-                     value={settingsForm.ebayAffiliateId || ''}
-                     onChange={e => setSettingsForm({...settingsForm, ebayAffiliateId: e.target.value})}
-                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-blue-400 font-mono"
-                     placeholder="e.g. 5338..."
-                   />
-                </div>
-                <div className="space-y-4">
-                   <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Shein Affiliate ID</label>
-                   <input 
-                     type="text" 
-                     value={settingsForm.sheinAffiliateId || ''}
-                     onChange={e => setSettingsForm({...settingsForm, sheinAffiliateId: e.target.value})}
-                     className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-pink-400 font-mono"
-                     placeholder="Partner ID"
+                     placeholder="e.g. enterprise-20"
                    />
                 </div>
               </div>

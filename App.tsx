@@ -15,21 +15,18 @@ import {
   MessageCircle, 
   UserPlus, 
   Users, 
-  Box, 
   Lock, 
   Store, 
-  ChevronRight, 
-  ArrowLeft, 
-  UserCheck, 
   ArrowRight,
-  ShieldCheck,
-  User,
-  Settings,
   Monitor,
   Search,
   CheckCircle2,
+  RefreshCw,
+  LogOut,
+  Settings2,
+  AlertCircle,
   X,
-  CreditCard
+  Rocket
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
@@ -53,11 +50,14 @@ const App: React.FC = () => {
   const [allMessages, setAllMessages] = useState<Message[]>([]);
   const [isDbConnected, setIsDbConnected] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isFetching, setIsFetching] = useState(true);
 
   // Portal Interaction State
   const [searchStoreName, setSearchStoreName] = useState('');
   const [selectedRole, setSelectedRole] = useState<'Owner' | 'Shopper'>('Shopper');
   const [foundProfile, setFoundProfile] = useState<UserProfile | null>(null);
+  const [isRegistering, setIsRegistering] = useState(false);
+  const [regData, setRegData] = useState({ name: '', key: '' });
 
   // General UI State
   const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages'>('shop');
@@ -68,15 +68,23 @@ const App: React.FC = () => {
   const isConfigured = !supabaseUrl.includes("your-project-id");
 
   useEffect(() => {
-    if (!isConfigured) return;
+    if (!isConfigured) {
+      setIsInitialized(true);
+      setIsFetching(false);
+      return;
+    }
+
     const productsChannel = dbService.subscribeToProducts(setProducts);
     const settingsChannel = dbService.subscribeToSettings(setShopSettings);
     const messagesChannel = dbService.subscribeToMessages(setAllMessages);
+    
     const profilesChannel = dbService.subscribeToProfiles((p) => {
-      setProfiles(p);
+      setProfiles(p || []);
       setIsDbConnected(true);
       setIsInitialized(true);
+      setIsFetching(false);
     });
+
     return () => {
       productsChannel.unsubscribe();
       settingsChannel.unsubscribe();
@@ -85,13 +93,15 @@ const App: React.FC = () => {
     };
   }, [isConfigured]);
 
-  // Real-time Store Search Engine
+  // Real-time Store Search Engine - Optimized for safety and clarity
   useEffect(() => {
-    if (searchStoreName.trim().length > 1) {
-      const match = profiles.find(p => 
-        p.name.toLowerCase().includes(searchStoreName.toLowerCase()) || 
-        p.handle.toLowerCase().includes(searchStoreName.toLowerCase())
-      );
+    const query = searchStoreName.trim().toLowerCase();
+    if (query.length > 1) {
+      const match = profiles.find(p => {
+        const nameMatch = p?.name ? String(p.name).toLowerCase().includes(query) : false;
+        const handleMatch = p?.handle ? String(p.handle).toLowerCase().includes(query) : false;
+        return nameMatch || handleMatch;
+      });
       setFoundProfile(match || null);
     } else {
       setFoundProfile(null);
@@ -109,49 +119,52 @@ const App: React.FC = () => {
 
   const handleAccessHub = () => {
     if (!foundProfile) {
-      alert("Verification Error: Please search for and select a valid Enterprise first.");
+      alert("Verification Pending: You must find a valid store identity before entering. If this is your first time, click 'Build Your Profile'.");
       return;
     }
 
     if (selectedRole === 'Owner') {
-      const pass = prompt(`Management Authentication Required for: ${foundProfile.name}. Please enter your access key:`);
+      const pass = prompt(`Management Access Key for ${foundProfile.name}:`);
       if (pass === foundProfile.password) {
         setCurrentUser(foundProfile);
-      } else {
-        alert("Authentication Failed: Invalid management credentials.");
+        setActiveTab('admin'); 
+      } else if (pass !== null) {
+        alert("Authentication Failed: The Management Key entered is incorrect.");
       }
     } else {
-      // Direct Shopper Access
       setCurrentUser({ 
         ...foundProfile, 
         role: 'Shopper', 
         id: 'customer_' + Date.now(), 
-        name: 'Public Customer' 
+        name: 'Guest Customer' 
       });
+      setActiveTab('shop');
     }
   };
 
-  const handleBuildProfile = async () => {
-    const name = prompt("Enter the name for this Enterprise Identity (e.g. Heather Feist):");
-    if (!name) return;
-    const password = prompt("Establish a management password for this Owner identity:") || "";
-    const handle = name.toLowerCase().replace(/\s/g, '_') + Math.floor(Math.random() * 100);
+  const handleFinalizeRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!regData.name.trim()) return;
     
+    const handle = regData.name.toLowerCase().replace(/\s/g, '_') + Math.floor(Math.random() * 100);
     const newProfile: Partial<UserProfile> = {
-      name,
+      name: regData.name,
       handle,
       role: 'Owner',
-      password,
-      bio: `Executive Identity Hub for ${name}'s Enterprise storefront.`,
-      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`
+      password: regData.key,
+      bio: `Executive boutique hub for ${regData.name}. Strategic inventory management active.`,
+      avatarUrl: `https://api.dicebear.com/7.x/avataaars/svg?seed=${regData.name}`
     };
 
     try {
       await dbService.upsertProfile(newProfile);
-      alert("Profile Successfully Built! You can now access your storefront by searching for this name.");
-      setSearchStoreName(name); // Auto-populate search to show success
+      setSearchStoreName(regData.name); 
+      setSelectedRole('Owner');
+      setIsRegistering(false);
+      setRegData({ name: '', key: '' });
+      alert(`Identity Hub built for ${regData.name}! You can now use your key to log in.`);
     } catch (e) {
-      alert("System Error: Profile creation failed. Please check your cloud connection.");
+      alert("System Error: Identity creation failed. Please check your cloud connection.");
     }
   };
 
@@ -164,49 +177,92 @@ const App: React.FC = () => {
     for (const item of items) { await dbService.saveProduct(item); }
   };
 
-  const handleSyncToMarketplace = async (productId: string) => {
-    const product = products.find(p => p.id === productId);
-    if (product) {
-      await dbService.saveProduct({ ...product, isMarketplaceSynced: true });
-    }
-  };
+  const filteredProducts = products.filter(p => 
+    platformFilter === 'All' || p.platform === platformFilter
+  );
 
-  const handlePurchaseComplete = async (itemIds: string[]) => {
-    for (const id of itemIds) {
-      const product = products.find(p => p.id === id);
-      if (product) {
-        await dbService.saveProduct({ ...product, isReceived: true, isWishlist: false });
-      }
-    }
-    setCart([]);
-  };
-
-  const filteredProducts = platformFilter === 'All' ? products : products.filter(p => p.platform === platformFilter);
-  const categorizedProducts = Object.values(ProductCategory).map(cat => ({
-    category: cat,
-    items: filteredProducts.filter(p => p.category === cat)
+  const categorizedProducts = Object.values(ProductCategory).map(category => ({
+    category,
+    items: filteredProducts.filter(p => p.category === category)
   })).filter(group => group.items.length > 0);
 
-  // PORTAL UI: STORE SEARCH & ROLE SELECTION
-  if (!currentUser && isInitialized) {
+  const isOwner = currentUser?.role === 'Owner';
+
+  // LOGIN PORTAL UI
+  if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Background Atmosphere */}
+        {/* Atmosphere */}
         <div className="absolute top-0 -left-20 w-[40rem] h-[40rem] bg-indigo-600/5 rounded-full blur-[150px] animate-pulse"></div>
         <div className="absolute bottom-0 -right-20 w-[40rem] h-[40rem] bg-violet-600/5 rounded-full blur-[150px] animate-pulse delay-1000"></div>
 
-        <div className="max-w-7xl w-full glass-card rounded-[5rem] p-10 md:p-24 space-y-16 relative z-10 border border-white/5 shadow-[0_0_100px_rgba(0,0,0,0.5)] backdrop-blur-3xl">
+        {/* Registration Modal Overlay */}
+        {isRegistering && (
+          <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 animate-fadeIn">
+            <div className="glass-card max-w-xl w-full rounded-[4rem] p-12 border border-white/10 shadow-3xl relative">
+              <button 
+                onClick={() => setIsRegistering(false)} 
+                className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors p-2"
+              >
+                <X size={28} />
+              </button>
+              
+              <div className="text-center space-y-4 mb-10">
+                <div className="w-20 h-20 bg-indigo-600/20 text-indigo-400 rounded-3xl flex items-center justify-center mx-auto mb-6 border border-indigo-500/30">
+                  <UserPlus size={40} />
+                </div>
+                <h2 className="text-4xl font-display font-bold text-white">Build Your Identity</h2>
+                <p className="text-slate-500 text-sm italic">Initialize your enterprise registry credentials.</p>
+              </div>
+
+              <form onSubmit={handleFinalizeRegistration} className="space-y-8">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Store Owner / Business Name</label>
+                  <input 
+                    required 
+                    type="text" 
+                    value={regData.name} 
+                    onChange={e => setRegData({...regData, name: e.target.value})}
+                    placeholder="e.g. Heather Feist" 
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-medium" 
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Private Management Key</label>
+                  <input 
+                    required 
+                    type="password" 
+                    value={regData.key} 
+                    onChange={e => setRegData({...regData, key: e.target.value})}
+                    placeholder="Enter a secret code..." 
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-mono" 
+                  />
+                </div>
+
+                <button 
+                  type="submit" 
+                  className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-4 group"
+                >
+                  Launch Enterprise <Rocket size={24} className="group-hover:translate-y-[-4px] group-hover:translate-x-[4px] transition-transform" />
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        <div className="max-w-7xl w-full glass-card rounded-[5rem] p-10 md:p-24 space-y-16 relative z-10 border border-white/5 shadow-3xl backdrop-blur-3xl">
           
           <div className="text-center space-y-4">
-            <h1 className="text-6xl md:text-8xl font-display font-bold text-white tracking-tighter leading-none">Enterprise Portal</h1>
-            <p className="text-slate-500 text-xl font-light max-w-2xl mx-auto italic">Strategic access for business owners and valued customers.</p>
+            <h1 className="text-6xl md:text-8xl font-display font-bold text-white tracking-tighter leading-none">Enterprise Access</h1>
+            <p className="text-slate-500 text-xl font-light max-w-2xl mx-auto italic">Strategic management hub for store owners and customers.</p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-stretch">
             
-            {/* LEFT COLUMN: THE ENTERPRISE (SEARCH) */}
-            <div className="flex flex-col space-y-10 bg-white/[0.03] p-12 rounded-[4rem] border border-white/5 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/10 rounded-full blur-3xl"></div>
+            {/* LEFT SIDE: SEARCH DISCOVERY */}
+            <div className="flex flex-col space-y-8 bg-white/[0.03] p-12 rounded-[4rem] border border-white/5 shadow-2xl relative">
+              {isFetching && <RefreshCw size={20} className="absolute top-8 right-8 text-indigo-500 animate-spin" />}
               
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
@@ -214,80 +270,87 @@ const App: React.FC = () => {
                       <Search size={28} />
                    </div>
                    <div>
-                     <h3 className="text-3xl font-display font-bold text-white">Find Enterprise</h3>
-                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Search Verification Hub</p>
+                     <h3 className="text-3xl font-display font-bold text-white">Identity Search</h3>
+                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Locate Your Storefront</p>
                    </div>
                 </div>
 
                 <div className="relative group">
+                  <Search className="absolute left-8 top-8 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={24} />
                   <input 
                     type="text" 
                     value={searchStoreName}
                     onChange={(e) => setSearchStoreName(e.target.value)}
-                    placeholder="Search Store (e.g. Heather Feist)..." 
-                    className="w-full bg-slate-900/50 border-2 border-white/5 rounded-3xl pl-8 pr-8 py-8 outline-none focus:border-indigo-500 text-white text-2xl font-display tracking-wide transition-all shadow-inner placeholder:text-slate-700"
+                    placeholder="Type Store Owner Name..." 
+                    className="w-full bg-slate-900/50 border-2 border-white/5 rounded-[2.5rem] pl-20 pr-8 py-8 outline-none focus:border-indigo-500 text-white text-2xl font-display tracking-wide transition-all shadow-inner placeholder:text-slate-800"
                   />
                 </div>
 
                 {foundProfile ? (
-                  <div className="flex items-center gap-8 p-8 bg-indigo-600/10 border-2 border-indigo-500/30 rounded-[3rem] animate-fadeIn transition-all shadow-2xl">
-                    <img src={foundProfile.avatarUrl} className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500/50 shadow-xl" alt="" />
+                  <div className="flex items-center gap-8 p-8 bg-indigo-600/10 border-2 border-indigo-500/30 rounded-[3rem] animate-fadeIn shadow-xl">
+                    <img src={foundProfile.avatarUrl} className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500/50 shadow-lg" alt="" />
                     <div className="flex-1">
                       <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                        <CheckCircle2 size={12} /> Identity Verified
+                        <CheckCircle2 size={12} /> Enterprise Located
                       </p>
                       <h4 className="text-3xl font-display font-bold text-white leading-none">{foundProfile.name}</h4>
-                      <p className="text-xs text-slate-500 mt-2 font-mono">ID: {foundProfile.handle}</p>
+                      <p className="text-xs text-slate-500 mt-2 font-mono">HANDLE: @{foundProfile.handle}</p>
                     </div>
                   </div>
+                ) : searchStoreName.length > 2 ? (
+                  <div className="p-12 text-center text-slate-400 border-2 border-dashed border-red-500/20 rounded-[3rem] space-y-4 bg-red-500/[0.02]">
+                    <AlertCircle size={48} className="mx-auto text-red-500/50" />
+                    <p className="text-sm font-bold">" {searchStoreName} " Not Found</p>
+                    <button onClick={() => setIsRegistering(true)} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors underline decoration-2 underline-offset-4">
+                      Create this Identity now
+                    </button>
+                  </div>
                 ) : (
-                  <div className="p-12 text-center text-slate-600 border-2 border-dashed border-white/5 rounded-[3rem] space-y-4">
-                    <Monitor size={48} className="mx-auto opacity-10" />
-                    <p className="text-sm font-light italic max-w-[200px] mx-auto">Awaiting store identification to proceed with access.</p>
+                  <div className="p-12 text-center text-slate-700 border-2 border-dashed border-white/5 rounded-[3rem] space-y-4">
+                    <Store size={48} className="mx-auto opacity-10" />
+                    <p className="text-sm font-light italic">Type your name to reveal your management portal.</p>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* RIGHT COLUMN: THE IDENTITY (ROLE) */}
+            {/* RIGHT SIDE: ROLE IDENTITY */}
             <div className="flex flex-col justify-center space-y-10">
                <div className="flex items-center gap-4 mb-2">
                   <div className="bg-slate-800 p-4 rounded-3xl text-slate-400">
                     <Users size={28} />
                   </div>
                   <div>
-                    <h3 className="text-3xl font-display font-bold text-white">Select Identity</h3>
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Privilege & Role Assignment</p>
+                    <h3 className="text-3xl font-display font-bold text-white">Select Access</h3>
+                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Authorization Level</p>
                   </div>
                </div>
 
-               <div className="grid grid-cols-1 gap-8">
+               <div className="space-y-6">
                   <button 
                     onClick={() => setSelectedRole('Owner')}
-                    className={`group flex items-center gap-8 p-10 rounded-[3.5rem] transition-all text-left border-2 ${selectedRole === 'Owner' ? 'bg-indigo-600 border-indigo-500 shadow-[0_20px_60px_rgba(79,70,229,0.3)] scale-105' : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.08]'}`}
+                    className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Owner' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}
                   >
-                    <div className={`p-5 rounded-[2rem] transition-all ${selectedRole === 'Owner' ? 'bg-white/20 text-white rotate-6' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700'}`}>
+                    <div className={`p-5 rounded-[2rem] ${selectedRole === 'Owner' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}>
                       <Lock size={32} />
                     </div>
                     <div>
-                      <p className="text-2xl font-display font-bold text-white">Enterprise Owner</p>
-                      <p className={`text-[10px] uppercase font-black tracking-widest mt-1.5 ${selectedRole === 'Owner' ? 'text-indigo-200' : 'text-slate-500'}`}>Full Admin Privileges</p>
+                      <p className="text-2xl font-display font-bold text-white">Executive Owner</p>
+                      <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Full Hub Control</p>
                     </div>
-                    {selectedRole === 'Owner' && <ArrowRight className="ml-auto text-white/50" size={24} />}
                   </button>
 
                   <button 
                     onClick={() => setSelectedRole('Shopper')}
-                    className={`group flex items-center gap-8 p-10 rounded-[3.5rem] transition-all text-left border-2 ${selectedRole === 'Shopper' ? 'bg-indigo-600 border-indigo-500 shadow-[0_20px_60px_rgba(79,70,229,0.3)] scale-105' : 'bg-white/5 border-white/5 hover:border-white/10 hover:bg-white/[0.08]'}`}
+                    className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Shopper' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}
                   >
-                    <div className={`p-5 rounded-[2rem] transition-all ${selectedRole === 'Shopper' ? 'bg-white/20 text-white rotate-6' : 'bg-slate-800 text-slate-500 group-hover:bg-slate-700'}`}>
+                    <div className={`p-5 rounded-[2rem] ${selectedRole === 'Shopper' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}>
                       <ShoppingBag size={32} />
                     </div>
                     <div>
                       <p className="text-2xl font-display font-bold text-white">Public Customer</p>
-                      <p className={`text-[10px] uppercase font-black tracking-widest mt-1.5 ${selectedRole === 'Shopper' ? 'text-indigo-200' : 'text-slate-500'}`}>General Market Access</p>
+                      <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Browse Collection</p>
                     </div>
-                    {selectedRole === 'Shopper' && <ArrowRight className="ml-auto text-white/50" size={24} />}
                   </button>
                </div>
             </div>
@@ -296,29 +359,26 @@ const App: React.FC = () => {
           <div className="pt-16 border-t border-white/5 flex flex-col items-center gap-12">
             <button 
               onClick={handleAccessHub}
-              disabled={!foundProfile}
-              className="w-full max-w-2xl bg-white text-black py-8 rounded-[3rem] text-xl font-black uppercase tracking-[0.3em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-6 disabled:opacity-10 active:scale-95 group"
+              disabled={!foundProfile || isFetching}
+              className="w-full max-w-2xl bg-white text-black py-8 rounded-[3rem] text-xl font-black uppercase tracking-[0.3em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-6 disabled:opacity-10 group active:scale-95"
             >
-              Enter Hub Infrastructure <ArrowRight size={32} className="group-hover:translate-x-3 transition-transform" />
+              Initialize Hub Session <ArrowRight size={32} className="group-hover:translate-x-3 transition-transform" />
             </button>
 
              <div className="flex items-center gap-12">
                <button 
-                 onClick={handleBuildProfile}
-                 className="flex items-center gap-3 text-slate-500 hover:text-indigo-400 transition-all text-xs font-black uppercase tracking-[0.3em] group"
+                 onClick={() => setIsRegistering(true)}
+                 className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"
                >
                  <UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile
+                 <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span>
                </button>
-               <div className="w-1.5 h-1.5 bg-slate-800 rounded-full"></div>
-               <p className="text-[10px] text-slate-700 font-black uppercase tracking-[0.2em]">Secure Session: V2.5.4</p>
              </div>
           </div>
         </div>
       </div>
     );
   }
-
-  const isOwner = currentUser?.role === 'Owner';
 
   return (
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-200 selection:bg-indigo-500/30">
@@ -354,10 +414,21 @@ const App: React.FC = () => {
             {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-white text-black text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shadow-lg">{cart.length}</span>}
           </button>
           
-          {isOwner && <button onClick={() => setActiveTab('admin')} className="bg-white text-black px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-200 transition-all shadow-xl shadow-white/10">Dashboard</button>}
+          {isOwner && (
+            <button 
+              onClick={() => setActiveTab('admin')} 
+              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl ${activeTab === 'admin' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-white text-black hover:bg-slate-200 shadow-white/10'}`}
+            >
+              Dashboard
+            </button>
+          )}
           
-          <button onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} className="p-2 text-slate-600 hover:text-red-400 transition-colors">
-            <Monitor size={18} />
+          <button 
+            onClick={() => { setCurrentUser(null); setSearchStoreName(''); setActiveTab('shop'); }} 
+            className="p-2.5 text-slate-600 hover:text-red-400 transition-colors bg-white/5 rounded-xl border border-white/5"
+            title="Log Out / Exit Enterprise"
+          >
+            <LogOut size={18} />
           </button>
         </div>
       </nav>
@@ -369,6 +440,7 @@ const App: React.FC = () => {
                <div className="relative z-10 max-w-3xl">
                   <div className="flex items-center gap-3 mb-8">
                      <span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Verified Collection</span>
+                     {currentUser && <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active session for: {currentUser.name}</span>}
                   </div>
                   <h2 className="text-6xl md:text-8xl font-display font-bold text-white mb-8 leading-tight tracking-tighter">{shopSettings.heroHeadline}</h2>
                   <p className="text-xl text-slate-400 font-light leading-relaxed mb-12 max-w-2xl">{shopSettings.heroSubtext}</p>
@@ -388,7 +460,7 @@ const App: React.FC = () => {
                   </div>
                </div>
                
-               {categorizedProducts.map((group) => (
+               {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (
                  <section key={group.category} className="space-y-8 pb-12">
                    <div className="flex items-center gap-4">
                       <div className="h-px flex-1 bg-white/5"></div>
@@ -401,25 +473,40 @@ const App: React.FC = () => {
                     ))}
                    </div>
                  </section>
-               ))}
+               )) : (
+                 <div className="py-20 text-center space-y-4 opacity-30">
+                   <Monitor size={48} className="mx-auto" />
+                   <p className="font-display text-2xl">Boutique Inventory Pending...</p>
+                 </div>
+               )}
             </div>
           </div>
         )}
         
         {activeTab === 'messages' && currentUser && isOwner && <DirectMessages currentUser={currentUser} allMessages={allMessages} onSendMessage={(text, recipientId) => dbService.sendMessage({ senderId: currentUser.id, recipientId, text, timestamp: Date.now() })} onDeleteMessage={dbService.deleteMessage} otherProfiles={profiles.filter(p => p.id !== currentUser.id)} />}
-        {activeTab === 'admin' && isOwner && <AdminPanel shopSettings={shopSettings} onUpdateShopSettings={handleUpdateShopSettings} onAddProduct={handleAddProduct} products={products} creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onCompleteChallenge={() => {}} dbConnected={isDbConnected} onSyncMarketplace={handleSyncToMarketplace} />}
+        {activeTab === 'admin' && isOwner && <AdminPanel shopSettings={shopSettings} onUpdateShopSettings={handleUpdateShopSettings} onAddProduct={handleAddProduct} products={products} creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onCompleteChallenge={() => {}} dbConnected={isDbConnected} onSyncMarketplace={() => {}} />}
         {activeTab === 'community' && isOwner && <CommunityLobby creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onVote={() => {}} />}
         {activeTab === 'tryon' && <VirtualTryOn products={products} />}
       </main>
 
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={handlePurchaseComplete} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={() => {}} />
 
       <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6">
-        <div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3">
-           <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-           <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span>
+        <div className="flex items-center gap-10">
+          <div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3">
+             <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
+             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span>
+          </div>
+          {!isOwner && (
+            <button 
+              onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} 
+              className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"
+            >
+              <Settings2 size={12} /> Access Management Console
+            </button>
+          )}
         </div>
-        <p className="text-slate-600 text-sm font-light">Infrastructure v2.5 | Constructive Designs Inc.</p>
+        <p className="text-slate-600 text-sm font-light">Infrastructure v2.5 | Enterprise Solutions Inc.</p>
       </footer>
     </div>
   );

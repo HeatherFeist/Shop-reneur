@@ -40,8 +40,14 @@ export const dbService = {
   },
 
   subscribeToProfiles: (callback: (profiles: UserProfile[]) => void) => {
-    supabase.from('profiles').select('*').then(({ data }) => {
-      if (data) callback(data.map(mapProfile));
+    // Immediate fetch to initialize UI safely
+    supabase.from('profiles').select('*').then(({ data, error }) => {
+      if (error) {
+        console.warn("Supabase fetch profiles error:", error);
+        callback([]); // Proceed with empty state
+      } else {
+        callback(data ? data.map(mapProfile) : []);
+      }
     });
 
     return supabase.channel('profiles-realtime')

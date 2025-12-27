@@ -18,12 +18,13 @@ export interface Product {
   additionalImages?: string[]; 
   videoUrl?: string; 
   affiliateLink: string; 
-  platform: 'Amazon' | 'Shein'; 
+  platform: 'Amazon' | 'Shein' | 'eBay'; 
   isWishlist: boolean; 
   isReceived?: boolean; 
   stockCount?: number; 
   isMarketplaceSynced?: boolean; 
   asin?: string; 
+  marketplaceId?: string; 
 }
 
 export enum ProductCategory {
@@ -32,7 +33,7 @@ export enum ProductCategory {
   ACCESSORIES = 'Accessories',
   HAIR = 'Hair Care',
   TECH = 'Tech & Gadgets',
-  SHEIN = 'Shein Finds'
+  LIFESTYLE = 'Lifestyle'
 }
 
 export interface UserProfile {
@@ -41,7 +42,9 @@ export interface UserProfile {
   handle: string;
   bio: string;
   avatarUrl: string;
-  role: 'Daughter' | 'Mother' | 'Board Member' | 'Family Member' | 'Sponsor';
+  role: 'Owner' | 'Shopper' | 'Partner';
+  password?: string; // For Owner access
+  storeOwnerId?: string; // Links a shopper to a specific admin's store
   shippingAddress?: ShippingAddress;
 }
 
@@ -63,7 +66,9 @@ export interface ShopSettings {
   backgroundColor: string;
   fontHeading: string;
   fontBody: string;
-  amazonAffiliateTag?: string; 
+  amazonAffiliateTag?: string;
+  ebayAffiliateId?: string;
+  sheinAffiliateId?: string;
 }
 
 export interface CreatorStats {
@@ -80,24 +85,6 @@ export interface CartItem extends Product {
   orderType: 'purchase' | 'gift';
 }
 
-export interface SocialPost {
-  id: string;
-  authorName: string;
-  shopName: string;
-  avatarUrl: string;
-  caption: string;
-  likes: number;
-  views: number;
-  platform: 'TikTok' | 'Instagram' | 'Facebook';
-  isChallengeEntry: boolean;
-  hasVoted: boolean;
-  taggedUsers?: string[];
-}
-
-/**
- * Interface for AI-generated business challenges/content prompts
- * Used by the Business Mentor to guide teen entrepreneurs
- */
 export interface ContentPrompt {
   title: string;
   description: string;

@@ -17,7 +17,9 @@ const mapProduct = (p: any): Product => ({
   isWishlist: p.is_wishlist,
   isReceived: p.is_received,
   stockCount: p.stock_count,
-  isMarketplaceSynced: p.is_marketplace_synced || false
+  isMarketplaceSynced: p.is_marketplace_synced || false,
+  asin: p.asin,
+  marketplaceId: p.marketplace_id
 });
 
 const mapProfile = (p: any): UserProfile => ({
@@ -26,7 +28,8 @@ const mapProfile = (p: any): UserProfile => ({
   handle: p.handle,
   bio: p.bio,
   avatarUrl: p.avatar_url,
-  role: p.role
+  role: p.role,
+  password: p.password
 });
 
 export const dbService = {
@@ -56,7 +59,8 @@ export const dbService = {
       handle: profile.handle,
       bio: profile.bio,
       avatar_url: profile.avatarUrl,
-      role: profile.role
+      role: profile.role,
+      password: profile.password
     });
     if (error) throw error;
   },
@@ -89,6 +93,8 @@ export const dbService = {
       is_received: product.isReceived,
       stock_count: product.stockCount,
       is_marketplace_synced: product.isMarketplaceSynced,
+      asin: product.asin,
+      marketplace_id: product.marketplaceId,
       updated_at: new Date()
     };
     const { error } = product.id 
@@ -114,7 +120,9 @@ export const dbService = {
         backgroundColor: data.background_color,
         fontHeading: data.font_heading,
         fontBody: data.font_body,
-        amazonAffiliateTag: data.amazon_affiliate_tag
+        amazonAffiliateTag: data.amazon_affiliate_tag,
+        ebayAffiliateId: data.ebay_affiliate_id,
+        sheinAffiliateId: data.shein_affiliate_id
       }); });
 
     return supabase.channel('settings-realtime')
@@ -130,7 +138,9 @@ export const dbService = {
           backgroundColor: data.background_color,
           fontHeading: data.font_heading,
           fontBody: data.font_body,
-          amazonAffiliateTag: data.amazon_affiliate_tag
+          amazonAffiliateTag: data.amazon_affiliate_tag,
+          ebayAffiliateId: data.ebay_affiliate_id,
+          sheinAffiliateId: data.shein_affiliate_id
         });
       }).subscribe();
   },
@@ -148,6 +158,8 @@ export const dbService = {
       font_heading: settings.fontHeading,
       font_body: settings.fontBody,
       amazon_affiliate_tag: settings.amazonAffiliateTag,
+      ebay_affiliate_id: settings.ebayAffiliateId,
+      shein_affiliate_id: settings.sheinAffiliateId,
       updated_at: new Date()
     });
   },

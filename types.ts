@@ -16,13 +16,13 @@ export interface Product {
   description: string;
   imageUrl: string;
   additionalImages?: string[]; 
-  videoUrl?: string; // The promotional/review video link
-  videoReviewCompleted?: boolean; // Milestone 1
+  videoUrl?: string; // Link to the user's review video
+  videoReviewCompleted?: boolean; // Requirement 1
   affiliateLink: string; 
   platform: 'Amazon' | 'Shein' | 'eBay'; 
   isWishlist: boolean; 
   isReceived?: boolean; 
-  stockCount?: number; // Milestone 2: Must be > 0 (for sale)
+  stockCount: number; // Requirement 2: Must be >= 2 (1 personal + 1 inventory)
   isMarketplaceSynced?: boolean; 
   asin?: string; 
   marketplaceId?: string; 

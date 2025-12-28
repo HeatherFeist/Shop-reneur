@@ -31,7 +31,8 @@ import {
   Loader2,
   Zap,
   User,
-  Home
+  Home,
+  Palette
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
@@ -68,7 +69,7 @@ const App: React.FC = () => {
   const [regSuccess, setRegSuccess] = useState(false);
 
   // General UI State
-  const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages' | 'profile'>('shop');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [platformFilter, setPlatformFilter] = useState<'All' | 'Amazon' | 'Shein' | 'eBay'>('All');
@@ -172,11 +173,10 @@ const App: React.FC = () => {
     };
 
     try {
-      await dbService.upsertProfile(newProfile);
-      setProfiles(prev => [...prev, newProfile]);
-      completeRegistration(newProfile);
+      const saved = await dbService.upsertProfile(newProfile);
+      setProfiles(prev => [...prev, saved]);
+      completeRegistration(saved);
     } catch (err: any) {
-      console.warn("Cloud save failed, bypassing to local mode for immediate access.", err);
       setProfiles(prev => [...prev, newProfile]);
       completeRegistration(newProfile);
     }
@@ -245,7 +245,6 @@ const App: React.FC = () => {
   const handlePurchaseComplete = async (itemIds: string[]) => {
     const updatedProducts = products.map(p => {
       if (itemIds.includes(p.id)) {
-        // Increment stock. Note: First unit is for review (milestone), second+ is for inventory.
         const currentStock = p.stockCount || 0;
         return { 
           ...p, 
@@ -258,9 +257,8 @@ const App: React.FC = () => {
     });
 
     setProducts(updatedProducts);
-    setCart([]); // Clear cart after verified acquisition
+    setCart([]); 
     
-    // Sync to DB
     try {
       for (const id of itemIds) {
         const prod = updatedProducts.find(x => x.id === id);
@@ -268,6 +266,16 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Inventory sync failed", e);
+    }
+  };
+
+  const handleAttachVideo = (productId: string) => {
+    const url = prompt("Paste your TikTok/Reels review link for this product:");
+    if (url) {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        handleUpdateProduct({ ...product, videoUrl: url, videoReviewCompleted: true });
+      }
     }
   };
 
@@ -372,7 +380,7 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-200 selection:bg-indigo-500/30">
       <nav className="sticky top-0 z-50 glass-nav px-8 h-20 flex justify-between items-center">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveTab('shop')}>
-          <div className="bg-indigo-600 text-white p-2.5 rounded-xl transition-transform group-hover:scale-110 shadow-lg shadow-indigo-600/20 overflow-hidden">
+          <div className="bg-indigo-600 text-white p-2.5 rounded-xl transition-transform group-hover:scale-110 shadow-lg shadow-indigo-600/20 overflow-hidden h-12 w-12 flex items-center justify-center">
             {shopSettings.logoUrl ? <img src={shopSettings.logoUrl} className="w-full h-full object-cover" alt="Logo" /> : <LayoutGrid size={22} />}
           </div>
           <div><h1 className="text-xl font-bold font-display text-white leading-none tracking-tight">{shopSettings.storeName}</h1><p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1.5">{shopSettings.tagline}</p></div>
@@ -383,10 +391,22 @@ const App: React.FC = () => {
             <button onClick={() => setActiveTab('tryon')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'tryon' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Studio</button>
             {isOwner && <button onClick={() => setActiveTab('community')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'community' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Network</button>}
           </div>
+          
           <div className="h-6 w-px bg-white/10"></div>
-          {isOwner && <button onClick={() => setActiveTab('messages')} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5"><MessageCircle size={20} /><span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#020617]"></span></button>}
+          
+          {isOwner && (
+            <div className="flex items-center gap-4">
+               <button onClick={() => setActiveTab('profile')} className={`p-2.5 rounded-xl border transition-all ${activeTab === 'profile' ? 'bg-indigo-600 border-indigo-400 text-white' : 'bg-white/5 border-white/5 text-slate-500 hover:text-white'}`} title="Edit My Profile">
+                  <User size={20} />
+               </button>
+               <button onClick={() => setActiveTab('messages')} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5"><MessageCircle size={20} /><span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#020617]"></span></button>
+            </div>
+          )}
+          
           <button onClick={() => setIsCartOpen(true)} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5"><ShoppingBag size={20} />{cart.length > 0 && <span className="absolute -top-1 -right-1 bg-white text-black text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shadow-lg">{cart.length}</span>}</button>
+          
           {isOwner && <button onClick={() => setActiveTab('admin')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl ${activeTab === 'admin' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-white text-black hover:bg-slate-200 shadow-white/10'}`}>Dashboard</button>}
+          
           <button onClick={() => { setCurrentUser(null); setSearchStoreName(''); setActiveTab('shop'); }} className="p-2.5 text-slate-600 hover:text-red-400 transition-colors bg-white/5 rounded-xl border border-white/5" title="Log Out"><LogOut size={18} /></button>
         </div>
       </nav>
@@ -403,7 +423,7 @@ const App: React.FC = () => {
             </div>
             <div className="space-y-12">
                <div className="flex flex-col md:flex-row justify-between items-end gap-6"><div><h3 className="text-4xl font-display font-bold text-white mb-2">Curated Assets</h3><p className="text-slate-500 text-sm font-light">Explore validated products by category.</p></div><div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">{['All', 'Amazon', 'eBay', 'Shein'].map((p) => (<button key={p} onClick={() => setPlatformFilter(p as any)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${platformFilter === p ? 'bg-white text-black shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>{p}</button>))}</div></div>
-               {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (<section key={group.category} className="space-y-8 pb-12"><div className="flex items-center gap-4"><div className="h-px flex-1 bg-white/5"></div><h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{group.category}</h4><div className="h-px flex-1 bg-white/5"></div></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">{group.items.map(p => (<ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} />))}</div></section>)) : (<div className="py-20 text-center space-y-4 opacity-30"><Monitor size={48} className="mx-auto" /><p className="font-display text-2xl">Boutique Inventory Pending...</p></div>)}
+               {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (<section key={group.category} className="space-y-8 pb-12"><div className="flex items-center gap-4"><div className="h-px flex-1 bg-white/5"></div><h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{group.category}</h4><div className="h-px flex-1 bg-white/5"></div></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">{group.items.map(p => (<ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} onUploadReview={handleAttachVideo} />))}</div></section>)) : (<div className="py-20 text-center space-y-4 opacity-30"><Monitor size={48} className="mx-auto" /><p className="font-display text-2xl text-slate-600">Boutique Inventory Pending...</p></div>)}
             </div>
           </div>
         )}
@@ -416,6 +436,15 @@ const App: React.FC = () => {
           />
         )}
         
+        {activeTab === 'profile' && isOwner && currentUser && (
+          <div className="space-y-8 animate-fadeIn">
+             <button onClick={() => setActiveTab('shop')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors">
+                <Home size={12} /> Back to Storefront
+             </button>
+             <ProfileEditor profile={currentUser} onUpdateProfile={handleUpdateProfile} />
+          </div>
+        )}
+
         {activeTab === 'community' && isOwner && (<CommunityLobby creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onVote={() => {}} onBackToStore={() => setActiveTab('shop')} />)}
         
         {activeTab === 'tryon' && (
@@ -428,7 +457,7 @@ const App: React.FC = () => {
 
       <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={handlePurchaseComplete} />
 
-      <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6"><div className="flex items-center gap-10"><div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span></div>{!isOwner && (<button onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"><Settings2 size={12} /> Access Management Console</button>)}</div><p className="text-slate-600 text-sm font-light">Infrastructure v2.5 | Enterprise Solutions Inc.</p></footer>
+      <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6"><div className="flex items-center gap-10"><div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span></div>{!isOwner && (<button onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"><Settings2 size={12} /> Access Management Console</button>)}</div><p className="text-slate-600 text-sm font-light">Infrastructure v3.2 | Enterprise Solutions Inc.</p></footer>
     </div>
   );
 };

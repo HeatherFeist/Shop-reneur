@@ -6,18 +6,18 @@ const mapProduct = (p: any): Product => ({
   id: p.id,
   name: p.name,
   price: Number(p.price),
-  // Fix: cost_price mapped to costPrice in Product interface
   costPrice: p.cost_price ? Number(p.cost_price) : 0,
   category: p.category,
   description: p.description,
   imageUrl: p.image_url,
   additionalImages: p.additional_images || [],
   videoUrl: p.video_url,
+  videoReviewCompleted: p.video_review_completed || false,
   affiliateLink: p.affiliate_link,
   platform: p.platform,
   isWishlist: p.is_wishlist,
   isReceived: p.is_received,
-  stockCount: p.stock_count,
+  stockCount: p.stock_count || 0,
   isMarketplaceSynced: p.is_marketplace_synced || false,
   asin: p.asin,
   marketplaceId: p.marketplace_id
@@ -28,7 +28,6 @@ const mapProfile = (p: any): UserProfile => ({
   name: p.name,
   handle: p.handle,
   bio: p.bio,
-  // Fixed: database avatar_url mapped to interface property avatarUrl
   avatarUrl: p.avatar_url,
   role: p.role,
   password: p.password
@@ -42,16 +41,17 @@ export const dbService = {
       if (error) throw error;
       return (data || []).map(mapProfile);
     } catch (e) {
-      console.warn("DB profiles table not ready, using local state.");
-      return [];
+      console.warn("DB profiles table access error, checking local storage.");
+      const local = localStorage.getItem('local_profiles');
+      return local ? JSON.parse(local) : [];
     }
   },
 
   subscribeToProfiles: (callback: (profiles: UserProfile[]) => void) => {
     supabase.from('profiles').select('*').then(({ data, error }) => {
       if (error) {
-        console.warn("Supabase fetch profiles error:", error);
-        callback([]); 
+        const local = localStorage.getItem('local_profiles');
+        callback(local ? JSON.parse(local) : []);
       } else {
         callback(data ? data.map(mapProfile) : []);
       }
@@ -60,7 +60,11 @@ export const dbService = {
     return supabase.channel('profiles-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'profiles' }, async () => {
         const { data } = await supabase.from('profiles').select('*');
-        if (data) callback(data.map(mapProfile));
+        if (data) {
+          const mapped = data.map(mapProfile);
+          localStorage.setItem('local_profiles', JSON.stringify(mapped));
+          callback(mapped);
+        }
       })
       .subscribe();
   },
@@ -76,12 +80,43 @@ export const dbService = {
       password: profile.password
     };
     
-    const { data, error } = await supabase.from('profiles').upsert(payload).select();
-    if (error) {
-      console.error("Upsert failed, likely missing profiles table:", error);
-      throw error;
+    try {
+      const { data, error } = await supabase.from('profiles').upsert(payload).select();
+      if (error) throw error;
+      if (!data || data.length === 0) throw new Error("No data returned from upsert");
+      
+      const mapped = mapProfile(data[0]);
+      // Sync local storage
+      const local = localStorage.getItem('local_profiles');
+      const profiles = local ? JSON.parse(local) : [];
+      const updated = profiles.filter((p: any) => p.id !== mapped.id);
+      updated.push(mapped);
+      localStorage.setItem('local_profiles', JSON.stringify(updated));
+      
+      return mapped;
+    } catch (error: any) {
+      const errorDetail = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      console.error(`Upsert failed, likely missing profiles table: ${errorDetail}`);
+      
+      // Fallback to local state so the app doesn't break
+      const mapped = {
+        id: profile.id || Date.now().toString(),
+        name: profile.name || '',
+        handle: profile.handle || '',
+        bio: profile.bio || '',
+        avatarUrl: profile.avatarUrl || '',
+        role: profile.role || 'Owner',
+        password: profile.password || ''
+      } as UserProfile;
+      
+      const local = localStorage.getItem('local_profiles');
+      const profiles = local ? JSON.parse(local) : [];
+      const updated = profiles.filter((p: any) => p.id !== mapped.id);
+      updated.push(mapped);
+      localStorage.setItem('local_profiles', JSON.stringify(updated));
+      
+      return mapped;
     }
-    return mapProfile(data[0]);
   },
 
   // --- Products ---
@@ -106,6 +141,7 @@ export const dbService = {
       image_url: product.imageUrl,
       additional_images: product.additionalImages,
       video_url: product.videoUrl,
+      video_review_completed: product.videoReviewCompleted,
       affiliate_link: product.affiliateLink,
       platform: product.platform,
       is_wishlist: product.isWishlist,
@@ -119,7 +155,7 @@ export const dbService = {
     const { error } = product.id 
       ? await supabase.from('products').update(dbPayload).eq('id', product.id)
       : await supabase.from('products').insert([dbPayload]);
-    if (error) throw error;
+    if (error) console.error("Product Save Error:", error);
   },
 
   deleteProduct: async (productId: string) => {
@@ -132,6 +168,7 @@ export const dbService = {
       .then(({ data }) => { if (data) callback({
         storeName: data.store_name,
         tagline: data.tagline,
+        logoUrl: data.logo_url,
         heroHeadline: data.hero_headline,
         heroSubtext: data.hero_subtext,
         primaryColor: data.primary_color,
@@ -150,8 +187,8 @@ export const dbService = {
         if (data) callback({
           storeName: data.store_name,
           tagline: data.tagline,
+          logoUrl: data.logo_url,
           heroHeadline: data.hero_headline,
-          // Fixed: database hero_subtext mapped to interface property heroSubtext
           heroSubtext: data.hero_subtext,
           primaryColor: data.primary_color,
           secondaryColor: data.secondary_color,
@@ -170,6 +207,7 @@ export const dbService = {
       id: 'global_settings',
       store_name: settings.storeName,
       tagline: settings.tagline,
+      logo_url: settings.logoUrl,
       hero_headline: settings.heroHeadline,
       hero_subtext: settings.heroSubtext,
       primary_color: settings.primaryColor,

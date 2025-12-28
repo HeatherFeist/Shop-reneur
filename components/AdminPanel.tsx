@@ -5,7 +5,13 @@ import { generateProductDescription, generateProductImage } from '../services/ge
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
 import ProfileEditor from './ProfileEditor';
-import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, Monitor, UserCircle, Video, Home, Lock, Unlock } from 'lucide-react';
+import { 
+  Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, 
+  Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, 
+  Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, 
+  Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, 
+  Monitor, UserCircle, Video, Home, Lock, Unlock, AlertCircle
+} from 'lucide-react';
 
 interface AdminPanelProps {
   onAddProduct: (product: Product | Product[]) => void;
@@ -264,7 +270,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       <tbody>
                          {products.map(product => {
                            const margin = product.price - (product.costPrice || 0);
-                           const isUnlocked = product.videoReviewCompleted && (product.stockCount || 0) > 0;
+                           const stockCount = product.stockCount || 0;
+                           const hasReview = product.videoReviewCompleted;
+                           const isUnlocked = hasReview && stockCount >= 2;
                            
                            return (
                             <tr key={product.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors group ${isUnlocked ? 'bg-indigo-500/[0.02]' : ''}`}>
@@ -280,15 +288,15 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                <td className="px-8 py-6">
                                   <div className="flex flex-col items-center gap-2">
                                      <div className="flex gap-1.5">
-                                        <div title="Review Video" className={`p-1.5 rounded-md ${product.videoReviewCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-700'}`}>
+                                        <div title="Review Video" className={`p-1.5 rounded-md ${hasReview ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
                                            <Video size={12} />
                                         </div>
-                                        <div title="Customer Inventory" className={`p-1.5 rounded-md ${(product.stockCount || 0) > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-700'}`}>
+                                        <div title={`Stock: ${stockCount}/2`} className={`p-1.5 rounded-md ${stockCount >= 2 ? 'bg-emerald-500/20 text-emerald-400' : stockCount >= 1 ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-slate-700'}`}>
                                            <Boxes size={12} />
                                         </div>
                                      </div>
                                      <span className={`text-[8px] font-black uppercase tracking-widest ${isUnlocked ? 'text-indigo-400' : 'text-slate-600'}`}>
-                                        {isUnlocked ? 'Enterprise Grade' : 'Incubator Phase'}
+                                        {isUnlocked ? 'Enterprise Grade' : hasReview ? 'Personal Stock Only' : 'Incubator Phase'}
                                      </span>
                                   </div>
                                </td>
@@ -308,7 +316,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                </td>
                                <td className="px-8 py-6 text-center">
                                   <div className="flex items-center justify-center gap-2">
-                                     {!product.videoReviewCompleted && (
+                                     {!hasReview && stockCount >= 1 && (
+                                       <button onClick={() => handleAttachVideo(product.id)} className="p-2.5 text-white bg-rose-600 rounded-xl transition-all shadow-lg animate-pulse" title="Immediate Action: Review Video">
+                                          <AlertCircle size={14} />
+                                       </button>
+                                     )}
+                                     {!hasReview && stockCount === 0 && (
                                        <button onClick={() => handleAttachVideo(product.id)} className="p-2.5 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-xl transition-all" title="Upload Review Video">
                                           <Video size={14} />
                                        </button>

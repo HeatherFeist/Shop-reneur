@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { CartItem, ShopSettings, UserProfile } from '../types';
-import { X, ShoppingBag, ExternalLink, Trash2, Gift, ShieldCheck, CheckCircle, Loader2, ArrowRight, ShoppingCart, Info } from 'lucide-react';
+import { X, ShoppingBag, ExternalLink, Trash2, Gift, ShieldCheck, CheckCircle, Loader2, ArrowRight, ShoppingCart, Info, RotateCcw, AlertTriangle } from 'lucide-react';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -28,12 +28,16 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
   const total = cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
   const generateAmazonBatchUrl = () => {
+    // Note: This requires valid ASINs. If ASIN is a placeholder, Amazon will reject.
     const baseUrl = "https://www.amazon.com/gp/aws/cart/add.html?";
     const params = new URLSearchParams();
     amazonItems.forEach((item, index) => {
-      const identifier = item.asin || item.marketplaceId || item.name;
-      params.append(`ASIN.${index + 1}`, identifier);
-      params.append(`Quantity.${index + 1}`, item.quantity.toString());
+      // Use ASIN strictly for batching; Amazon doesn't support batching by Name/ID easily
+      const identifier = item.asin || item.marketplaceId || '';
+      if (identifier) {
+        params.append(`ASIN.${index + 1}`, identifier);
+        params.append(`Quantity.${index + 1}`, item.quantity.toString());
+      }
     });
     const tag = shopSettings.amazonAffiliateTag || 'shopreneur-20';
     params.append('AssociateTag', tag);
@@ -45,11 +49,16 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
       setView('transferring');
       setTimeout(() => {
         const amazonUrl = generateAmazonBatchUrl();
+        // If no valid ASINs were found, show warning instead of redirecting
+        if (!amazonUrl.includes('ASIN.1')) {
+           alert("Lifecycle Error: Amazon assets require a valid ASIN for batch fulfillment. Please update Asset Ledger.");
+           setView('cart');
+           return;
+        }
         window.open(amazonUrl, '_blank');
         setView('confirm');
       }, 1500);
     } else {
-      // If only other items, we just mark as "processing" since they are direct links
       setView('confirm');
     }
   };
@@ -59,6 +68,10 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
       onPurchaseComplete(cartItems.map(i => i.id));
     }
     setView('success');
+  };
+
+  const handleCancelVerification = () => {
+    setView('cart');
   };
 
   return (
@@ -96,7 +109,9 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                           <img src={item.imageUrl} className="w-16 h-16 rounded-xl object-cover bg-slate-800" alt="" />
                           <div className="flex-1 min-w-0">
                              <h4 className="font-bold text-slate-200 text-sm truncate">{item.name}</h4>
-                             <p className="text-[10px] text-orange-500 font-bold uppercase tracking-widest">ASIN: {item.asin || 'ID Set'}</p>
+                             <p className={`text-[10px] font-bold uppercase tracking-widest ${item.asin ? 'text-orange-500' : 'text-red-500 flex items-center gap-1'}`}>
+                                {item.asin ? `ASIN: ${item.asin}` : <><AlertTriangle size={10}/> Missing ASIN</>}
+                             </p>
                              <div className="flex justify-between items-center mt-2">
                                 <span className="text-white font-bold text-xs">${item.price.toFixed(2)}</span>
                                 <button onClick={() => onRemoveItem(item.id)} className="text-slate-600 hover:text-red-400 transition-colors"><Trash2 size={14} /></button>
@@ -159,7 +174,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
               <div className="bg-white/5 p-4 rounded-2xl border border-white/10 flex gap-3">
                  <Info size={16} className="text-indigo-400 shrink-0 mt-0.5" />
                  <p className="text-[10px] text-slate-500 leading-relaxed font-light">
-                   Amazon items will be compiled into a single cart. Shein and eBay items should be purchased via their direct affiliate links above.
+                   Amazon checkout will open in a new tab. After purchase, return here to verify assets for inventory sync.
                  </p>
               </div>
               
@@ -173,24 +188,23 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
             </div>
           )}
 
-          {view === 'transferring' && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
-               <div className="w-20 h-20 border-2 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin shadow-xl"></div>
-               <p className="text-xl font-light text-slate-400">Compiling logistics data...</p>
-            </div>
-          )}
-
           {view === 'confirm' && (
             <div className="flex-1 p-8 flex flex-col justify-center space-y-8">
                <div className="glass-card p-8 rounded-3xl border border-indigo-500/20 text-center space-y-6">
                   <ExternalLink size={48} className="mx-auto text-indigo-400" />
                   <h3 className="text-2xl font-display font-bold text-white">Finalize Transaction</h3>
                   <p className="text-sm text-slate-400 leading-relaxed">
-                    Once the assets are acquired externally, click below to verify and lock them into the boutique inventory.
+                    Once the assets are acquired on Amazon/Shein, click below to verify and lock them into the boutique inventory.
                   </p>
-                  <button onClick={handleFinalConfirmation} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-all">
-                    Verify & Commit Assets
-                  </button>
+                  
+                  <div className="space-y-3">
+                    <button onClick={handleFinalConfirmation} className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl hover:bg-indigo-500 transition-all shadow-xl">
+                      Verify & Commit Assets
+                    </button>
+                    <button onClick={handleCancelVerification} className="w-full bg-white/5 text-slate-400 py-4 rounded-xl hover:text-white transition-all flex items-center justify-center gap-2">
+                       <RotateCcw size={14} /> Failed / Go Back
+                    </button>
+                  </div>
                </div>
             </div>
           )}
@@ -202,7 +216,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-3xl font-display font-bold text-white">Logistics Complete</h3>
-                  <p className="text-slate-400 font-light">Inventory records updated. Assets are now marked as fulfilled in the boutique registry.</p>
+                  <p className="text-slate-400 font-light">Assets are now marked as "Received". Remember to upload your video review to unlock global marketplace sales!</p>
                 </div>
                 <button onClick={onClose} className="w-full bg-white text-black py-4 rounded-xl font-bold">Return to Hub</button>
              </div>

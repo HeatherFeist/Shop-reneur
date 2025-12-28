@@ -30,7 +30,8 @@ import {
   Rocket,
   Loader2,
   Zap,
-  User
+  User,
+  Home
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
@@ -194,7 +195,6 @@ const App: React.FC = () => {
   };
 
   const handleUpdateShopSettings = async (settings: ShopSettings) => {
-    // Optimistic UI Update
     setShopSettings(settings);
     try {
       await dbService.updateSettings(settings);
@@ -214,10 +214,7 @@ const App: React.FC = () => {
 
   const handleAddProduct = async (productOrProducts: Product | Product[]) => {
     const itemsToAdd = Array.isArray(productOrProducts) ? productOrProducts : [productOrProducts];
-    
-    // Optimistic UI Update: Show them immediately
     setProducts(prev => [...itemsToAdd, ...prev]);
-    
     try {
       for (const item of itemsToAdd) { 
         await dbService.saveProduct(item); 
@@ -227,13 +224,50 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateProduct = async (updated: Product) => {
+    setProducts(prev => prev.map(p => p.id === updated.id ? updated : p));
+    try {
+      await dbService.saveProduct(updated);
+    } catch (e) {
+      console.error("Update failed", e);
+    }
+  };
+
   const handleDeleteProduct = async (id: string) => {
-    // Optimistic UI Update
     setProducts(prev => prev.filter(p => p.id !== id));
     try {
       await dbService.deleteProduct(id);
     } catch (e) {
       console.error("Delete Failed", e);
+    }
+  };
+
+  const handlePurchaseComplete = async (itemIds: string[]) => {
+    const updatedProducts = products.map(p => {
+      if (itemIds.includes(p.id)) {
+        // Increment stock. Note: First unit is for review (milestone), second+ is for inventory.
+        const currentStock = p.stockCount || 0;
+        return { 
+          ...p, 
+          isReceived: true, 
+          isWishlist: false,
+          stockCount: currentStock + 1 
+        };
+      }
+      return p;
+    });
+
+    setProducts(updatedProducts);
+    setCart([]); // Clear cart after verified acquisition
+    
+    // Sync to DB
+    try {
+      for (const id of itemIds) {
+        const prod = updatedProducts.find(x => x.id === id);
+        if (prod) await dbService.saveProduct(prod);
+      }
+    } catch (e) {
+      console.error("Inventory sync failed", e);
     }
   };
 
@@ -248,26 +282,16 @@ const App: React.FC = () => {
 
   const isOwner = currentUser?.role === 'Owner';
 
-  // LOGIN PORTAL UI
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
-        {/* Atmosphere */}
         <div className="absolute top-0 -left-20 w-[40rem] h-[40rem] bg-indigo-600/5 rounded-full blur-[150px] animate-pulse"></div>
         <div className="absolute bottom-0 -right-20 w-[40rem] h-[40rem] bg-violet-600/5 rounded-full blur-[150px] animate-pulse delay-1000"></div>
 
-        {/* Registration Modal Overlay */}
         {isRegistering && (
           <div className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xl flex items-center justify-center p-6 animate-fadeIn">
             <div className="glass-card max-w-xl w-full rounded-[4rem] p-12 border border-white/10 shadow-3xl relative">
-              <button 
-                onClick={() => setIsRegistering(false)} 
-                disabled={isRegLoading}
-                className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors p-2 disabled:opacity-20"
-              >
-                <X size={28} />
-              </button>
-              
+              <button onClick={() => setIsRegistering(false)} disabled={isRegLoading} className="absolute top-8 right-8 text-slate-500 hover:text-white transition-colors p-2 disabled:opacity-20"><X size={28} /></button>
               <div className="text-center space-y-4 mb-10">
                 <div className={`w-20 h-20 rounded-3xl flex items-center justify-center mx-auto mb-6 border transition-all ${regSuccess ? 'bg-emerald-500/20 border-emerald-500 text-emerald-400' : 'bg-indigo-600/20 text-indigo-400 border-indigo-500/30'}`}>
                   {regSuccess ? <CheckCircle2 size={40} className="animate-bounce" /> : isRegLoading ? <Loader2 size={40} className="animate-spin" /> : <UserPlus size={40} />}
@@ -275,45 +299,18 @@ const App: React.FC = () => {
                 <h2 className="text-4xl font-display font-bold text-white">{regSuccess ? "Identity Confirmed!" : "Build Your Identity"}</h2>
                 <p className="text-slate-500 text-sm italic">{regSuccess ? "Opening management dashboard..." : "Establish your store owner credentials."}</p>
               </div>
-
               {!regSuccess && (
                 <form onSubmit={handleFinalizeRegistration} className="space-y-8">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Owner / Business Name</label>
-                    <input 
-                      required 
-                      disabled={isRegLoading}
-                      type="text" 
-                      value={regData.name} 
-                      onChange={e => setRegData({...regData, name: e.target.value})}
-                      placeholder="e.g. Heather Feist" 
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-medium disabled:opacity-50" 
-                    />
+                    <input required disabled={isRegLoading} type="text" value={regData.name} onChange={e => setRegData({...regData, name: e.target.value})} placeholder="e.g. Heather Feist" className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-medium disabled:opacity-50" />
                   </div>
-
                   <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Access Key (For Login)</label>
-                    <input 
-                      required 
-                      disabled={isRegLoading}
-                      type="password" 
-                      value={regData.key} 
-                      onChange={e => setRegData({...regData, key: e.target.value})}
-                      placeholder="Set a secret code..." 
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-mono disabled:opacity-50" 
-                    />
+                    <input required disabled={isRegLoading} type="password" value={regData.key} onChange={e => setRegData({...regData, key: e.target.value})} placeholder="Set a secret code..." className="w-full bg-white/5 border border-white/10 rounded-2xl px-8 py-5 outline-none focus:border-indigo-500 text-white text-lg font-mono disabled:opacity-50" />
                   </div>
-
-                  <button 
-                    type="submit" 
-                    disabled={isRegLoading || !regData.name}
-                    className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-4 group disabled:opacity-50"
-                  >
-                    {isRegLoading ? (
-                      <>Validating Registry... <Loader2 size={24} className="animate-spin text-indigo-600" /></>
-                    ) : (
-                      <>Launch Enterprise <Rocket size={24} className="group-hover:translate-y-[-4px] group-hover:translate-x-[4px] transition-transform" /></>
-                    )}
+                  <button type="submit" disabled={isRegLoading || !regData.name} className="w-full bg-white text-black py-6 rounded-3xl font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-slate-200 transition-all flex items-center justify-center gap-4 group disabled:opacity-50">
+                    {isRegLoading ? <>Validating Registry... <Loader2 size={24} className="animate-spin text-indigo-600" /></> : <>Launch Enterprise <Rocket size={24} className="group-hover:translate-y-[-4px] group-hover:translate-x-[4px] transition-transform" /></>}
                   </button>
                 </form>
               )}
@@ -322,128 +319,49 @@ const App: React.FC = () => {
         )}
 
         <div className="max-w-7xl w-full glass-card rounded-[5rem] p-10 md:p-24 space-y-16 relative z-10 border border-white/5 shadow-3xl backdrop-blur-3xl">
-          
           <div className="text-center space-y-4">
             <h1 className="text-6xl md:text-8xl font-display font-bold text-white tracking-tighter leading-none">Enterprise Access</h1>
             <p className="text-slate-500 text-xl font-light max-w-2xl mx-auto italic">Strategic management hub for store owners and customers.</p>
           </div>
-
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-stretch">
-            
-            {/* LEFT SIDE: SEARCH DISCOVERY */}
             <div className="flex flex-col space-y-8 bg-white/[0.03] p-12 rounded-[4rem] border border-white/5 shadow-2xl relative">
               {isFetching && <RefreshCw size={20} className="absolute top-8 right-8 text-indigo-500 animate-spin" />}
-              
               <div className="space-y-6">
                 <div className="flex items-center gap-4">
-                   <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-600/20">
-                      <Search size={28} />
-                   </div>
-                   <div>
-                     <h3 className="text-3xl font-display font-bold text-white">Identity Search</h3>
-                     <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Locate Your Storefront</p>
-                   </div>
+                   <div className="bg-indigo-600 p-4 rounded-3xl text-white shadow-lg shadow-indigo-600/20"><Search size={28} /></div>
+                   <div><h3 className="text-3xl font-display font-bold text-white">Identity Search</h3><p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400">Locate Your Storefront</p></div>
                 </div>
-
                 <div className="relative group">
                   <Search className="absolute left-8 top-8 text-slate-500 group-focus-within:text-indigo-400 transition-colors" size={24} />
-                  <input 
-                    type="text" 
-                    value={searchStoreName}
-                    onChange={(e) => setSearchStoreName(e.target.value)}
-                    placeholder="Type Store Owner Name..." 
-                    className="w-full bg-slate-900/50 border-2 border-white/5 rounded-[2.5rem] pl-20 pr-8 py-8 outline-none focus:border-indigo-500 text-white text-2xl font-display tracking-wide transition-all shadow-inner placeholder:text-slate-800"
-                  />
+                  <input type="text" value={searchStoreName} onChange={(e) => setSearchStoreName(e.target.value)} placeholder="Type Store Owner Name..." className="w-full bg-slate-900/50 border-2 border-white/5 rounded-[2.5rem] pl-20 pr-8 py-8 outline-none focus:border-indigo-500 text-white text-2xl font-display tracking-wide transition-all shadow-inner placeholder:text-slate-800" />
                 </div>
-
                 {foundProfile ? (
                   <div className="flex items-center gap-8 p-8 bg-indigo-600/10 border-2 border-indigo-500/30 rounded-[3rem] animate-fadeIn shadow-xl">
                     <img src={foundProfile.avatarUrl} className="w-24 h-24 rounded-[2rem] border-4 border-indigo-500/50 shadow-lg" alt="" />
                     <div className="flex-1">
-                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2">
-                        <CheckCircle2 size={12} /> Enterprise Located
-                      </p>
+                      <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mb-1.5 flex items-center gap-2"><CheckCircle2 size={12} /> Enterprise Located</p>
                       <h4 className="text-3xl font-display font-bold text-white leading-none">{foundProfile.name}</h4>
                       <p className="text-xs text-slate-500 mt-2 font-mono">HANDLE: @{foundProfile.handle}</p>
                     </div>
                   </div>
                 ) : searchStoreName.length > 2 ? (
-                  <div className="p-12 text-center text-slate-400 border-2 border-dashed border-red-500/20 rounded-[3rem] space-y-4 bg-red-500/[0.02]">
-                    <AlertCircle size={48} className="mx-auto text-red-500/50" />
-                    <p className="text-sm font-bold">" {searchStoreName} " Not Found</p>
-                    <button onClick={() => setIsRegistering(true)} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors underline decoration-2 underline-offset-4">
-                      Create this Identity now
-                    </button>
-                  </div>
+                  <div className="p-12 text-center text-slate-400 border-2 border-dashed border-red-500/20 rounded-[3rem] space-y-4 bg-red-500/[0.02]"><AlertCircle size={48} className="mx-auto text-red-500/50" /><p className="text-sm font-bold">" {searchStoreName} " Not Found</p><button onClick={() => setIsRegistering(true)} className="text-[10px] font-black uppercase tracking-widest text-indigo-400 hover:text-white transition-colors underline decoration-2 underline-offset-4">Create this Identity now</button></div>
                 ) : (
-                  <div className="p-12 text-center text-slate-700 border-2 border-dashed border-white/5 rounded-[3rem] space-y-4">
-                    <Store size={48} className="mx-auto opacity-10" />
-                    <p className="text-sm font-light italic">Type your name to reveal your management portal.</p>
-                  </div>
+                  <div className="p-12 text-center text-slate-700 border-2 border-dashed border-white/5 rounded-[3rem] space-y-4"><Store size={48} className="mx-auto opacity-10" /><p className="text-sm font-light italic">Type your name to reveal your management portal.</p></div>
                 )}
               </div>
             </div>
-
-            {/* RIGHT SIDE: ROLE IDENTITY */}
             <div className="flex flex-col justify-center space-y-10">
-               <div className="flex items-center gap-4 mb-2">
-                  <div className="bg-slate-800 p-4 rounded-3xl text-slate-400">
-                    <Users size={28} />
-                  </div>
-                  <div>
-                    <h3 className="text-3xl font-display font-bold text-white">Select Access</h3>
-                    <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Authorization Level</p>
-                  </div>
-               </div>
-
+               <div className="flex items-center gap-4 mb-2"><div className="bg-slate-800 p-4 rounded-3xl text-slate-400"><Users size={28} /></div><div><h3 className="text-3xl font-display font-bold text-white">Select Access</h3><p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">Authorization Level</p></div></div>
                <div className="space-y-6">
-                  <button 
-                    onClick={() => setSelectedRole('Owner')}
-                    className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Owner' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}
-                  >
-                    <div className={`p-5 rounded-[2rem] ${selectedRole === 'Owner' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}>
-                      <Lock size={32} />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-white">Executive Owner</p>
-                      <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Full Hub Control</p>
-                    </div>
-                  </button>
-
-                  <button 
-                    onClick={() => setSelectedRole('Shopper')}
-                    className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Shopper' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}
-                  >
-                    <div className={`p-5 rounded-[2rem] ${selectedRole === 'Shopper' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}>
-                      <ShoppingBag size={32} />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-display font-bold text-white">Public Customer</p>
-                      <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Browse Collection</p>
-                    </div>
-                  </button>
+                  <button onClick={() => setSelectedRole('Owner')} className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Owner' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}><div className={`p-5 rounded-[2rem] ${selectedRole === 'Owner' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}><Lock size={32} /></div><div><p className="text-2xl font-display font-bold text-white">Executive Owner</p><p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Full Hub Control</p></div></button>
+                  <button onClick={() => setSelectedRole('Shopper')} className={`flex items-center gap-8 w-full p-10 rounded-[3rem] transition-all border-2 text-left ${selectedRole === 'Shopper' ? 'bg-indigo-600 border-indigo-400 shadow-2xl scale-[1.02]' : 'bg-white/5 border-white/5 hover:bg-white/[0.08]'}`}><div className={`p-5 rounded-[2rem] ${selectedRole === 'Shopper' ? 'bg-white/20 text-white' : 'bg-slate-800 text-slate-600'}`}><ShoppingBag size={32} /></div><div><p className="text-2xl font-display font-bold text-white">Public Customer</p><p className="text-[10px] uppercase font-black text-slate-400 tracking-widest mt-1">Browse Collection</p></div></button>
                </div>
             </div>
           </div>
-
           <div className="pt-16 border-t border-white/5 flex flex-col items-center gap-12">
-            <button 
-              onClick={handleAccessHub}
-              disabled={!foundProfile || isFetching}
-              className="w-full max-w-2xl bg-white text-black py-8 rounded-[3rem] text-xl font-black uppercase tracking-[0.3em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-6 disabled:opacity-10 group active:scale-95"
-            >
-              Initialize Hub Session <ArrowRight size={32} className="group-hover:translate-x-3 transition-transform" />
-            </button>
-
-             <div className="flex items-center gap-12">
-               <button 
-                 onClick={() => setIsRegistering(true)}
-                 className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"
-               >
-                 <UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile
-                 <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span>
-               </button>
-             </div>
+            <button onClick={handleAccessHub} disabled={!foundProfile || isFetching} className="w-full max-w-2xl bg-white text-black py-8 rounded-[3rem] text-xl font-black uppercase tracking-[0.3em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-6 disabled:opacity-10 group active:scale-95">Initialize Hub Session <ArrowRight size={32} className="group-hover:translate-x-3 transition-transform" /></button>
+             <div className="flex items-center gap-12"><button onClick={() => setIsRegistering(true)} className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile<span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span></button></div>
           </div>
         </div>
       </div>
@@ -455,55 +373,21 @@ const App: React.FC = () => {
       <nav className="sticky top-0 z-50 glass-nav px-8 h-20 flex justify-between items-center">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveTab('shop')}>
           <div className="bg-indigo-600 text-white p-2.5 rounded-xl transition-transform group-hover:scale-110 shadow-lg shadow-indigo-600/20 overflow-hidden">
-            {shopSettings.logoUrl ? (
-              <img src={shopSettings.logoUrl} className="w-full h-full object-cover" alt="Logo" />
-            ) : (
-              <LayoutGrid size={22} />
-            )}
+            {shopSettings.logoUrl ? <img src={shopSettings.logoUrl} className="w-full h-full object-cover" alt="Logo" /> : <LayoutGrid size={22} />}
           </div>
-          <div>
-            <h1 className="text-xl font-bold font-display text-white leading-none tracking-tight">{shopSettings.storeName}</h1>
-            <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1.5">{shopSettings.tagline}</p>
-          </div>
+          <div><h1 className="text-xl font-bold font-display text-white leading-none tracking-tight">{shopSettings.storeName}</h1><p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1.5">{shopSettings.tagline}</p></div>
         </div>
-
         <div className="flex items-center gap-6">
           <div className="hidden lg:flex items-center gap-10 mr-4">
             <button onClick={() => setActiveTab('shop')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'shop' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Storefront</button>
             <button onClick={() => setActiveTab('tryon')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'tryon' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Studio</button>
             {isOwner && <button onClick={() => setActiveTab('community')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'community' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Network</button>}
           </div>
-          
           <div className="h-6 w-px bg-white/10"></div>
-
-          {isOwner && (
-            <button onClick={() => setActiveTab('messages')} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5">
-              <MessageCircle size={20} />
-              <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#020617]"></span>
-            </button>
-          )}
-          
-          <button onClick={() => setIsCartOpen(true)} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5">
-            <ShoppingBag size={20} />
-            {cart.length > 0 && <span className="absolute -top-1 -right-1 bg-white text-black text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shadow-lg">{cart.length}</span>}
-          </button>
-          
-          {isOwner && (
-            <button 
-              onClick={() => setActiveTab('admin')} 
-              className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl ${activeTab === 'admin' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-white text-black hover:bg-slate-200 shadow-white/10'}`}
-            >
-              Dashboard
-            </button>
-          )}
-          
-          <button 
-            onClick={() => { setCurrentUser(null); setSearchStoreName(''); setActiveTab('shop'); }} 
-            className="p-2.5 text-slate-600 hover:text-red-400 transition-colors bg-white/5 rounded-xl border border-white/5"
-            title="Log Out / Exit Enterprise"
-          >
-            <LogOut size={18} />
-          </button>
+          {isOwner && <button onClick={() => setActiveTab('messages')} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5"><MessageCircle size={20} /><span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[#020617]"></span></button>}
+          <button onClick={() => setIsCartOpen(true)} className="relative p-2.5 text-slate-500 hover:text-indigo-400 transition-colors bg-white/5 rounded-xl border border-white/5"><ShoppingBag size={20} />{cart.length > 0 && <span className="absolute -top-1 -right-1 bg-white text-black text-[10px] font-black w-5 h-5 flex items-center justify-center rounded-full shadow-lg">{cart.length}</span>}</button>
+          {isOwner && <button onClick={() => setActiveTab('admin')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-xl ${activeTab === 'admin' ? 'bg-indigo-600 text-white shadow-indigo-600/20' : 'bg-white text-black hover:bg-slate-200 shadow-white/10'}`}>Dashboard</button>}
+          <button onClick={() => { setCurrentUser(null); setSearchStoreName(''); setActiveTab('shop'); }} className="p-2.5 text-slate-600 hover:text-red-400 transition-colors bg-white/5 rounded-xl border border-white/5" title="Log Out"><LogOut size={18} /></button>
         </div>
       </nav>
 
@@ -512,47 +396,14 @@ const App: React.FC = () => {
           <div className="animate-fadeIn space-y-16">
             <div className="relative glass-card rounded-[4rem] p-16 md:p-24 overflow-hidden border border-white/5 bg-gradient-to-br from-indigo-500/5 to-transparent">
                <div className="relative z-10 max-w-3xl">
-                  <div className="flex items-center gap-3 mb-8">
-                     <span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Verified Collection</span>
-                     {currentUser && <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active session for: {currentUser.name}</span>}
-                  </div>
+                  <div className="flex items-center gap-3 mb-8"><span className="bg-indigo-500/10 text-indigo-400 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border border-indigo-500/20">Verified Collection</span>{currentUser && <span className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Active session for: {currentUser.name}</span>}</div>
                   <h2 className="text-6xl md:text-8xl font-display font-bold text-white mb-8 leading-tight tracking-tighter">{shopSettings.heroHeadline}</h2>
                   <p className="text-xl text-slate-400 font-light leading-relaxed mb-12 max-w-2xl">{shopSettings.heroSubtext}</p>
                </div>
             </div>
-
             <div className="space-y-12">
-               <div className="flex flex-col md:flex-row justify-between items-end gap-6">
-                  <div>
-                    <h3 className="text-4xl font-display font-bold text-white mb-2">Curated Assets</h3>
-                    <p className="text-slate-500 text-sm font-light">Explore validated products by category.</p>
-                  </div>
-                  <div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">
-                     {['All', 'Amazon', 'eBay', 'Shein'].map((p) => (
-                       <button key={p} onClick={() => setPlatformFilter(p as any)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${platformFilter === p ? 'bg-white text-black shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>{p}</button>
-                     ))}
-                  </div>
-               </div>
-               
-               {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (
-                 <section key={group.category} className="space-y-8 pb-12">
-                   <div className="flex items-center gap-4">
-                      <div className="h-px flex-1 bg-white/5"></div>
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{group.category}</h4>
-                      <div className="h-px flex-1 bg-white/5"></div>
-                   </div>
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                    {group.items.map(p => (
-                      <ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} />
-                    ))}
-                   </div>
-                 </section>
-               )) : (
-                 <div className="py-20 text-center space-y-4 opacity-30">
-                   <Monitor size={48} className="mx-auto" />
-                   <p className="font-display text-2xl">Boutique Inventory Pending...</p>
-                 </div>
-               )}
+               <div className="flex flex-col md:flex-row justify-between items-end gap-6"><div><h3 className="text-4xl font-display font-bold text-white mb-2">Curated Assets</h3><p className="text-slate-500 text-sm font-light">Explore validated products by category.</p></div><div className="flex bg-white/5 p-1.5 rounded-2xl border border-white/10">{['All', 'Amazon', 'eBay', 'Shein'].map((p) => (<button key={p} onClick={() => setPlatformFilter(p as any)} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${platformFilter === p ? 'bg-white text-black shadow-xl' : 'text-slate-500 hover:text-slate-300'}`}>{p}</button>))}</div></div>
+               {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (<section key={group.category} className="space-y-8 pb-12"><div className="flex items-center gap-4"><div className="h-px flex-1 bg-white/5"></div><h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{group.category}</h4><div className="h-px flex-1 bg-white/5"></div></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">{group.items.map(p => (<ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} />))}</div></section>)) : (<div className="py-20 text-center space-y-4 opacity-30"><Monitor size={48} className="mx-auto" /><p className="font-display text-2xl">Boutique Inventory Pending...</p></div>)}
             </div>
           </div>
         )}
@@ -561,49 +412,23 @@ const App: React.FC = () => {
         
         {activeTab === 'admin' && isOwner && currentUser && (
           <AdminPanel 
-            shopSettings={shopSettings} 
-            onUpdateShopSettings={handleUpdateShopSettings} 
-            onAddProduct={handleAddProduct} 
-            onDeleteProduct={handleDeleteProduct} 
-            products={products} 
-            currentUser={currentUser}
-            onUpdateProfile={handleUpdateProfile}
-            creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} 
-            onCompleteChallenge={() => {}} 
-            dbConnected={isDbConnected} 
-            onSyncMarketplace={() => {}} 
+            shopSettings={shopSettings} onUpdateShopSettings={handleUpdateShopSettings} onAddProduct={handleAddProduct} onDeleteProduct={handleDeleteProduct} onUpdateProduct={handleUpdateProduct} products={products} currentUser={currentUser} onUpdateProfile={handleUpdateProfile} creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onCompleteChallenge={() => {}} dbConnected={isDbConnected} onBackToStore={() => setActiveTab('shop')}
           />
         )}
         
-        {activeTab === 'community' && isOwner && (
-          <CommunityLobby 
-            creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} 
-            onVote={() => {}} 
-          />
-        )}
+        {activeTab === 'community' && isOwner && (<CommunityLobby creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onVote={() => {}} onBackToStore={() => setActiveTab('shop')} />)}
         
-        {activeTab === 'tryon' && <VirtualTryOn products={products} />}
+        {activeTab === 'tryon' && (
+          <div className="space-y-8 animate-fadeIn">
+             <button onClick={() => setActiveTab('shop')} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors"><Home size={12} /> Back to Storefront</button>
+             <VirtualTryOn products={products} />
+          </div>
+        )}
       </main>
 
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={() => {}} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={handlePurchaseComplete} />
 
-      <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6">
-        <div className="flex items-center gap-10">
-          <div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3">
-             <div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div>
-             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span>
-          </div>
-          {!isOwner && (
-            <button 
-              onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} 
-              className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"
-            >
-              <Settings2 size={12} /> Access Management Console
-            </button>
-          )}
-        </div>
-        <p className="text-slate-600 text-sm font-light">Infrastructure v2.5 | Enterprise Solutions Inc.</p>
-      </footer>
+      <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6"><div className="flex items-center gap-10"><div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span></div>{!isOwner && (<button onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"><Settings2 size={12} /> Access Management Console</button>)}</div><p className="text-slate-600 text-sm font-light">Infrastructure v2.5 | Enterprise Solutions Inc.</p></footer>
     </div>
   );
 };

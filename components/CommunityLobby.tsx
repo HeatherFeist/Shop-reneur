@@ -3,11 +3,12 @@ import React, { useState, useEffect } from 'react';
 import { CreatorStats, ContentPrompt } from '../types';
 import { scanTrendsAndGenerateChallenges } from '../services/geminiService';
 import BusinessTip from './BusinessTip';
-import { Trophy, TrendingUp, Users, Flame, Zap, CheckCircle, Loader2, Globe, ExternalLink, ShieldCheck, Target, ArrowRight, ThumbsUp, Heart, Play } from 'lucide-react';
+import { Trophy, TrendingUp, Users, Flame, Zap, CheckCircle, Loader2, Globe, ExternalLink, ShieldCheck, Target, ArrowRight, ThumbsUp, Heart, Play, Home } from 'lucide-react';
 
 interface CommunityLobbyProps {
   creatorStats: CreatorStats;
   onVote: (postId: string) => void;
+  onBackToStore: () => void;
 }
 
 interface Submission {
@@ -21,7 +22,7 @@ interface Submission {
   timestamp: number;
 }
 
-const CommunityLobby: React.FC<CommunityLobbyProps> = ({ creatorStats, onVote }) => {
+const CommunityLobby: React.FC<CommunityLobbyProps> = ({ creatorStats, onVote, onBackToStore }) => {
   const [challenges, setChallenges] = useState<ContentPrompt[]>([]);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'challenges' | 'voting' | 'leaderboard'>('challenges');
@@ -54,9 +55,14 @@ const CommunityLobby: React.FC<CommunityLobbyProps> = ({ creatorStats, onVote })
   return (
     <div className="animate-fadeIn space-y-16">
       <div className="flex justify-between items-center mb-12">
-        <div className="space-y-2">
-          <h2 className="text-5xl font-display font-bold text-white tracking-tight">Family Enterprise Network</h2>
-          <p className="text-slate-500 font-light">Collaborate and compete to scale the organization.</p>
+        <div className="flex items-center gap-6">
+          <button onClick={onBackToStore} className="p-3 bg-white/5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+             <Home size={20} />
+          </button>
+          <div className="space-y-2">
+            <h2 className="text-5xl font-display font-bold text-white tracking-tight">Enterprise Network</h2>
+            <p className="text-slate-500 font-light">Collaborate and compete to scale the organization.</p>
+          </div>
         </div>
         <div className="flex gap-4 glass-card p-2 rounded-2xl border border-white/5">
            <button onClick={() => setActiveTab('challenges')} className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'challenges' ? 'bg-white text-black shadow-lg' : 'text-slate-500 hover:text-slate-300'}`}>Operations</button>

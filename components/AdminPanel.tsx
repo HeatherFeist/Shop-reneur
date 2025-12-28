@@ -5,11 +5,12 @@ import { generateProductDescription, generateProductImage } from '../services/ge
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
 import ProfileEditor from './ProfileEditor';
-import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, Monitor, UserCircle } from 'lucide-react';
+import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, Monitor, UserCircle, Video, Home, Lock, Unlock } from 'lucide-react';
 
 interface AdminPanelProps {
   onAddProduct: (product: Product | Product[]) => void;
   onDeleteProduct: (id: string) => void;
+  onUpdateProduct: (product: Product) => void;
   creatorStats: CreatorStats;
   onCompleteChallenge: (points: number) => void;
   shopSettings: ShopSettings;
@@ -18,12 +19,13 @@ interface AdminPanelProps {
   currentUser: UserProfile;
   onUpdateProfile: (profile: UserProfile) => void;
   dbConnected?: boolean;
-  onSyncMarketplace?: (productId: string) => void;
+  onBackToStore: () => void;
 }
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ 
   onAddProduct, 
   onDeleteProduct,
+  onUpdateProduct,
   creatorStats,
   shopSettings,
   onUpdateShopSettings,
@@ -31,7 +33,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   currentUser,
   onUpdateProfile,
   dbConnected = false,
-  onSyncMarketplace
+  onBackToStore
 }) => {
   const [activeAdminTab, setActiveAdminTab] = useState<'inventory' | 'brand' | 'marketplace' | 'identity'>('inventory');
   const [settingsForm, setSettingsForm] = useState<ShopSettings>(shopSettings);
@@ -77,6 +79,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       platform: formData.platform,
       isWishlist: true,
       isReceived: false,
+      videoReviewCompleted: false,
+      stockCount: 0,
       asin: formData.platform === 'Amazon' ? formData.marketplaceId : undefined,
       marketplaceId: formData.marketplaceId
     });
@@ -89,6 +93,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setIsSavingSettings(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 2000);
+  };
+
+  const handleAttachVideo = (productId: string) => {
+    const url = prompt("Paste your TikTok/Reels review link for this product:");
+    if (url) {
+      const product = products.find(p => p.id === productId);
+      if (product) {
+        onUpdateProduct({ ...product, videoUrl: url, videoReviewCompleted: true });
+      }
+    }
   };
 
   const getMarketplaceLabel = () => {
@@ -112,7 +126,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       </button>
 
       <div className="flex justify-between items-center mb-12 border-b border-white/5 pb-6 overflow-x-auto no-scrollbar">
-        <div className="flex gap-10 min-w-max">
+        <div className="flex items-center gap-10 min-w-max">
+          <button onClick={onBackToStore} className="p-3 bg-white/5 rounded-2xl text-slate-400 hover:text-white hover:bg-white/10 transition-all">
+             <Home size={20} />
+          </button>
           <button onClick={() => setActiveAdminTab('inventory')} className={`pb-6 px-2 font-black text-xs uppercase tracking-[0.2em] transition-all ${activeAdminTab === 'inventory' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Inventory Ops</button>
           <button onClick={() => setActiveAdminTab('marketplace')} className={`pb-6 px-2 font-black text-xs uppercase tracking-[0.2em] transition-all ${activeAdminTab === 'marketplace' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Marketplace Sync</button>
           <button onClick={() => setActiveAdminTab('identity')} className={`pb-6 px-2 font-black text-xs uppercase tracking-[0.2em] transition-all ${activeAdminTab === 'identity' ? 'text-indigo-400 border-b-2 border-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Identity Ops</button>
@@ -133,7 +150,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 <h3 className="text-4xl font-display font-bold text-white tracking-tight">Asset Onboarding</h3>
                 <p className="text-slate-500 text-sm">Define strategic inventory across verified global marketplaces.</p>
               </div>
-              <BusinessTip title="Market Categorization" content="Assigning categories ensures products appear in the correct 'Aisles' on the public storefront." />
+              <BusinessTip title="The 2-Unit Rule" content="New assets start as 'Incubator' items. To unlock full sales, you must provide 1 Review Video and have at least 1 unit in stock for customers (2 units total purchased)." />
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -222,10 +239,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
           </form>
 
+          {/* ACTIVE INVENTORY LEDGER */}
           <div className="pt-16 border-t border-white/5 space-y-8">
              <div className="flex justify-between items-center">
                 <h3 className="text-3xl font-display font-bold text-white flex items-center gap-4">
-                   <Boxes className="text-indigo-400" /> Active Inventory Ledger
+                   <Boxes className="text-indigo-400" /> Lifecycle Ledger
                 </h3>
                 <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">{products.length} Items Indexed</span>
              </div>
@@ -236,18 +254,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                       <thead>
                          <tr className="border-b border-white/5 bg-white/[0.03]">
                             <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">Asset</th>
-                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500">Market</th>
+                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Lifecycle</th>
                             <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Cost</th>
                             <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Retail</th>
                             <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-right">Margin</th>
-                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Action</th>
+                            <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-500 text-center">Actions</th>
                          </tr>
                       </thead>
                       <tbody>
                          {products.map(product => {
                            const margin = product.price - (product.costPrice || 0);
+                           const isUnlocked = product.videoReviewCompleted && (product.stockCount || 0) > 0;
+                           
                            return (
-                            <tr key={product.id} className="border-b border-white/5 hover:bg-white/[0.04] transition-colors group">
+                            <tr key={product.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors group ${isUnlocked ? 'bg-indigo-500/[0.02]' : ''}`}>
                                <td className="px-8 py-6">
                                   <div className="flex items-center gap-4">
                                      <img src={product.imageUrl} className="w-12 h-12 rounded-xl object-cover border border-white/10" alt="" />
@@ -258,24 +278,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                   </div>
                                </td>
                                <td className="px-8 py-6">
-                                  <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-md border ${product.platform === 'Amazon' ? 'bg-orange-500/10 text-orange-400 border-orange-500/20' : product.platform === 'Shein' ? 'bg-white/10 text-white border-white/20' : 'bg-blue-600/10 text-blue-400 border-blue-600/20'}`}>
-                                     {product.platform}
-                                  </span>
+                                  <div className="flex flex-col items-center gap-2">
+                                     <div className="flex gap-1.5">
+                                        <div title="Review Video" className={`p-1.5 rounded-md ${product.videoReviewCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-700'}`}>
+                                           <Video size={12} />
+                                        </div>
+                                        <div title="Customer Inventory" className={`p-1.5 rounded-md ${(product.stockCount || 0) > 0 ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-slate-700'}`}>
+                                           <Boxes size={12} />
+                                        </div>
+                                     </div>
+                                     <span className={`text-[8px] font-black uppercase tracking-widest ${isUnlocked ? 'text-indigo-400' : 'text-slate-600'}`}>
+                                        {isUnlocked ? 'Enterprise Grade' : 'Incubator Phase'}
+                                     </span>
+                                  </div>
                                </td>
                                <td className="px-8 py-6 text-right font-mono text-slate-400 text-sm">
                                   ${(product.costPrice || 0).toFixed(2)}
                                 </td>
-                               <td className="px-8 py-6 text-right font-mono text-white text-sm">
-                                  ${product.price.toFixed(2)}
+                               <td className={`px-8 py-6 text-right font-mono text-sm ${isUnlocked ? 'text-white font-bold' : 'text-slate-600'}`}>
+                                  <div className="flex items-center justify-end gap-2">
+                                     {!isUnlocked && <Lock size={10} />}
+                                     ${product.price.toFixed(2)}
+                                  </div>
                                 </td>
                                <td className="px-8 py-6 text-right">
                                   <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-widest ${margin >= 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
-                                     <TrendingUp size={10} />
                                      ${margin.toFixed(2)}
                                   </div>
                                </td>
                                <td className="px-8 py-6 text-center">
-                                  <button onClick={() => onDeleteProduct(product.id)} className="p-3 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all"><Trash2 size={16} /></button>
+                                  <div className="flex items-center justify-center gap-2">
+                                     {!product.videoReviewCompleted && (
+                                       <button onClick={() => handleAttachVideo(product.id)} className="p-2.5 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-xl transition-all" title="Upload Review Video">
+                                          <Video size={14} />
+                                       </button>
+                                     )}
+                                     <button onClick={() => onDeleteProduct(product.id)} className="p-2.5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all" title="Retire Asset">
+                                        <Trash2 size={14} />
+                                     </button>
+                                  </div>
                                </td>
                             </tr>
                            );
@@ -294,7 +335,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {activeAdminTab === 'identity' && (
-        <div className="animate-fadeIn py-8">
+        <div className="animate-fadeIn py-8 space-y-8">
+           <button onClick={onBackToStore} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-white transition-colors">
+              <Home size={12} /> Back to Hub
+           </button>
            <ProfileEditor profile={currentUser} onUpdateProfile={onUpdateProfile} />
         </div>
       )}

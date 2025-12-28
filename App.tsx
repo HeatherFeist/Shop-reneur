@@ -7,6 +7,7 @@ import CartDrawer from './components/CartDrawer';
 import VirtualTryOn from './components/VirtualTryOn';
 import CommunityLobby from './components/CommunityLobby';
 import DirectMessages from './components/DirectMessages';
+import ProfileEditor from './components/ProfileEditor';
 import { dbService } from './services/dbService';
 import { supabaseUrl } from './services/supabaseClient';
 import { 
@@ -28,12 +29,14 @@ import {
   X,
   Rocket,
   Loader2,
-  Zap
+  Zap,
+  User
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
   storeName: "Enterprise Hub",
   tagline: "Curated Professional Assets",
+  logoUrl: "",
   heroHeadline: "Professional Infrastructure",
   heroSubtext: "Building generational wealth through curated affiliate storefronts and strategic asset management.",
   primaryColor: "#6366f1", 
@@ -200,6 +203,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleUpdateProfile = async (updated: UserProfile) => {
+    setCurrentUser(updated);
+    try {
+      await dbService.upsertProfile(updated);
+    } catch (e) {
+      console.error("Profile sync failed", e);
+    }
+  };
+
   const handleAddProduct = async (productOrProducts: Product | Product[]) => {
     const itemsToAdd = Array.isArray(productOrProducts) ? productOrProducts : [productOrProducts];
     
@@ -212,7 +224,16 @@ const App: React.FC = () => {
       }
     } catch (e) {
       console.error("Product DB Save Failed", e);
-      // In a real app we might roll back, but here we prefer keeping them visible locally
+    }
+  };
+
+  const handleDeleteProduct = async (id: string) => {
+    // Optimistic UI Update
+    setProducts(prev => prev.filter(p => p.id !== id));
+    try {
+      await dbService.deleteProduct(id);
+    } catch (e) {
+      console.error("Delete Failed", e);
     }
   };
 
@@ -433,8 +454,12 @@ const App: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-[#020617] text-slate-200 selection:bg-indigo-500/30">
       <nav className="sticky top-0 z-50 glass-nav px-8 h-20 flex justify-between items-center">
         <div className="flex items-center gap-4 cursor-pointer group" onClick={() => setActiveTab('shop')}>
-          <div className="bg-indigo-600 text-white p-2.5 rounded-xl transition-transform group-hover:scale-110 shadow-lg shadow-indigo-600/20">
-            <LayoutGrid size={22} />
+          <div className="bg-indigo-600 text-white p-2.5 rounded-xl transition-transform group-hover:scale-110 shadow-lg shadow-indigo-600/20 overflow-hidden">
+            {shopSettings.logoUrl ? (
+              <img src={shopSettings.logoUrl} className="w-full h-full object-cover" alt="Logo" />
+            ) : (
+              <LayoutGrid size={22} />
+            )}
           </div>
           <div>
             <h1 className="text-xl font-bold font-display text-white leading-none tracking-tight">{shopSettings.storeName}</h1>
@@ -518,7 +543,7 @@ const App: React.FC = () => {
                    </div>
                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                     {group.items.map(p => (
-                      <ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={dbService.deleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} />
+                      <ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} />
                     ))}
                    </div>
                  </section>
@@ -533,8 +558,30 @@ const App: React.FC = () => {
         )}
         
         {activeTab === 'messages' && currentUser && isOwner && <DirectMessages currentUser={currentUser} allMessages={allMessages} onSendMessage={(text, recipientId) => dbService.sendMessage({ senderId: currentUser.id, recipientId, text, timestamp: Date.now() })} onDeleteMessage={dbService.deleteMessage} otherProfiles={profiles.filter(p => p.id !== currentUser.id)} />}
-        {activeTab === 'admin' && isOwner && <AdminPanel shopSettings={shopSettings} onUpdateShopSettings={handleUpdateShopSettings} onAddProduct={handleAddProduct} products={products} creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onCompleteChallenge={() => {}} dbConnected={isDbConnected} onSyncMarketplace={() => {}} />}
-        {activeTab === 'community' && isOwner && <CommunityLobby creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} onVote={() => {}} />}
+        
+        {activeTab === 'admin' && isOwner && currentUser && (
+          <AdminPanel 
+            shopSettings={shopSettings} 
+            onUpdateShopSettings={handleUpdateShopSettings} 
+            onAddProduct={handleAddProduct} 
+            onDeleteProduct={handleDeleteProduct} 
+            products={products} 
+            currentUser={currentUser}
+            onUpdateProfile={handleUpdateProfile}
+            creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} 
+            onCompleteChallenge={() => {}} 
+            dbConnected={isDbConnected} 
+            onSyncMarketplace={() => {}} 
+          />
+        )}
+        
+        {activeTab === 'community' && isOwner && (
+          <CommunityLobby 
+            creatorStats={{tier: 'Entrepreneur', streak: 1, points: 500, level: 'Influencer', inventoryCount: products.length, subscriptionPlan: 'Elite'}} 
+            onVote={() => {}} 
+          />
+        )}
+        
         {activeTab === 'tryon' && <VirtualTryOn products={products} />}
       </main>
 

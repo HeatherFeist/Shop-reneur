@@ -59,6 +59,7 @@ export interface Message {
 export interface ShopSettings {
   storeName: string;
   tagline: string;
+  logoUrl?: string;
   heroHeadline: string;
   heroSubtext: string;
   primaryColor: string;

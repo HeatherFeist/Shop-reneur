@@ -4,7 +4,7 @@ import { ProductCategory, Product, CreatorStats, ShopSettings } from '../types';
 import { generateProductDescription, generateProductImage } from '../services/geminiService';
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
-import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter } from 'lucide-react';
+import { Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, Filter, CheckCircle2 } from 'lucide-react';
 
 interface AdminPanelProps {
   onAddProduct: (product: Product | Product[]) => void;
@@ -31,6 +31,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [loading, setLoading] = useState(false);
   const [imageLoading, setImageLoading] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
 
   useEffect(() => { setSettingsForm(shopSettings); }, [shopSettings]);
 
@@ -74,6 +76,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setFormData({ name: '', price: '', costPrice: '', category: ProductCategory.FASHION, keywords: '', affiliateLink: '', platform: 'Amazon', description: '', imageUrl: '', additionalImages: [], videoUrl: '', isReceived: false, marketplaceId: '' });
   };
 
+  const handleUpdateSettings = async () => {
+    setIsSavingSettings(true);
+    await onUpdateShopSettings(settingsForm);
+    setIsSavingSettings(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 2000);
+  };
+
   const getMarketplaceLabel = () => {
     switch(formData.platform) {
       case 'Amazon': return 'Amazon ASIN';
@@ -82,6 +92,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       default: return 'Product ID';
     }
   };
+
+  const selectStyles = "w-full bg-slate-900 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white appearance-none cursor-pointer";
 
   return (
     <div className="glass-card p-10 rounded-[3rem] border border-white/5 relative bg-white/[0.01]">
@@ -119,27 +131,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               <div className="grid grid-cols-2 gap-4">
                  <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Marketplace</label>
-                    <select 
-                      value={formData.platform} 
-                      onChange={e => setFormData({...formData, platform: e.target.value as any})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white appearance-none"
-                    >
-                      <option value="Amazon">Amazon</option>
-                      <option value="Shein">Shein</option>
-                      <option value="eBay">eBay</option>
-                    </select>
+                    <div className="relative">
+                      <select 
+                        value={formData.platform} 
+                        onChange={e => setFormData({...formData, platform: e.target.value as any})}
+                        className={selectStyles}
+                      >
+                        <option value="Amazon" className="bg-slate-900 text-white">Amazon</option>
+                        <option value="Shein" className="bg-slate-900 text-white">Shein</option>
+                        <option value="eBay" className="bg-slate-900 text-white">eBay</option>
+                      </select>
+                    </div>
                  </div>
                  <div className="space-y-2">
                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1">Department</label>
-                    <select 
-                      value={formData.category} 
-                      onChange={e => setFormData({...formData, category: e.target.value as any})}
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white appearance-none"
-                    >
-                      {Object.values(ProductCategory).map(cat => (
-                        <option key={cat} value={cat}>{cat}</option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select 
+                        value={formData.category} 
+                        onChange={e => setFormData({...formData, category: e.target.value as any})}
+                        className={selectStyles}
+                      >
+                        {Object.values(ProductCategory).map(cat => (
+                          <option key={cat} value={cat} className="bg-slate-900 text-white">{cat}</option>
+                        ))}
+                      </select>
+                    </div>
                  </div>
               </div>
               <div className="grid grid-cols-1 gap-4">
@@ -229,10 +245,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
               </div>
 
               <button 
-                onClick={() => onUpdateShopSettings(settingsForm)}
-                className="w-full bg-indigo-600 text-white py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-3xl hover:bg-indigo-500 transition-all flex items-center justify-center gap-4"
+                onClick={handleUpdateSettings}
+                disabled={isSavingSettings}
+                className={`w-full py-6 rounded-[2.5rem] font-black uppercase tracking-widest shadow-3xl transition-all flex items-center justify-center gap-4 ${saveSuccess ? 'bg-emerald-500 text-white' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
               >
-                <Save size={24} /> Deploy Enterprise Updates
+                {isSavingSettings ? (
+                  <><Loader2 size={24} className="animate-spin" /> Synchronizing Logistics...</>
+                ) : saveSuccess ? (
+                  <><CheckCircle2 size={24} /> Updates Synchronized</>
+                ) : (
+                  <><Save size={24} /> Deploy Enterprise Updates</>
+                )}
               </button>
            </div>
         </div>

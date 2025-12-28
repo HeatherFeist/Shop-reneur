@@ -6,6 +6,7 @@ const mapProduct = (p: any): Product => ({
   id: p.id,
   name: p.name,
   price: Number(p.price),
+  // Fix: cost_price mapped to costPrice in Product interface
   costPrice: p.cost_price ? Number(p.cost_price) : 0,
   category: p.category,
   description: p.description,
@@ -27,6 +28,7 @@ const mapProfile = (p: any): UserProfile => ({
   name: p.name,
   handle: p.handle,
   bio: p.bio,
+  // Fixed: database avatar_url mapped to interface property avatarUrl
   avatarUrl: p.avatar_url,
   role: p.role,
   password: p.password
@@ -35,16 +37,21 @@ const mapProfile = (p: any): UserProfile => ({
 export const dbService = {
   // --- Profiles ---
   getProfiles: async (): Promise<UserProfile[]> => {
-    const { data } = await supabase.from('profiles').select('*');
-    return (data || []).map(mapProfile);
+    try {
+      const { data, error } = await supabase.from('profiles').select('*');
+      if (error) throw error;
+      return (data || []).map(mapProfile);
+    } catch (e) {
+      console.warn("DB profiles table not ready, using local state.");
+      return [];
+    }
   },
 
   subscribeToProfiles: (callback: (profiles: UserProfile[]) => void) => {
-    // Immediate fetch to initialize UI safely
     supabase.from('profiles').select('*').then(({ data, error }) => {
       if (error) {
         console.warn("Supabase fetch profiles error:", error);
-        callback([]); // Proceed with empty state
+        callback([]); 
       } else {
         callback(data ? data.map(mapProfile) : []);
       }
@@ -58,17 +65,23 @@ export const dbService = {
       .subscribe();
   },
 
-  upsertProfile: async (profile: Partial<UserProfile>) => {
-    const { error } = await supabase.from('profiles').upsert({
-      id: profile.id || undefined,
+  upsertProfile: async (profile: Partial<UserProfile>): Promise<UserProfile> => {
+    const payload = {
+      id: profile.id,
       name: profile.name,
       handle: profile.handle,
       bio: profile.bio,
       avatar_url: profile.avatarUrl,
       role: profile.role,
       password: profile.password
-    });
-    if (error) throw error;
+    };
+    
+    const { data, error } = await supabase.from('profiles').upsert(payload).select();
+    if (error) {
+      console.error("Upsert failed, likely missing profiles table:", error);
+      throw error;
+    }
+    return mapProfile(data[0]);
   },
 
   // --- Products ---
@@ -138,6 +151,7 @@ export const dbService = {
           storeName: data.store_name,
           tagline: data.tagline,
           heroHeadline: data.hero_headline,
+          // Fixed: database hero_subtext mapped to interface property heroSubtext
           heroSubtext: data.hero_subtext,
           primaryColor: data.primary_color,
           secondaryColor: data.secondary_color,

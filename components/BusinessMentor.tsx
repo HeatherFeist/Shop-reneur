@@ -4,12 +4,6 @@ import { GoogleGenAI, LiveServerMessage, Modality } from '@google/genai';
 import { MessageCircle, Send, X, TrendingUp, Loader2, Bot, Mic, MicOff, Volume2 } from 'lucide-react';
 import { ContentPrompt } from '../types';
 
-interface BusinessMentorProps {
-  onAddChallenge: (challenges: ContentPrompt[]) => void;
-  isOpen: boolean;
-  onClose: () => void;
-}
-
 const decode = (base64: string) => {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -58,7 +52,8 @@ const BusinessMentor: React.FC<BusinessMentorProps> = ({ onAddChallenge, isOpen,
       audioContextRef.current = audioContext;
 
       const sessionPromise = ai.live.connect({
-        model: 'gemini-2.5-flash-native-audio-preview-09-2025',
+        // Updated model name to match latest Gemini Live guidelines
+        model: 'gemini-2.5-flash-native-audio-preview-12-2025',
         callbacks: {
           onopen: () => {
             setIsLive(true);
@@ -115,7 +110,7 @@ const BusinessMentor: React.FC<BusinessMentorProps> = ({ onAddChallenge, isOpen,
     if (!inputText.trim()) return;
     
     setMessages(prev => [...prev, { sender: 'user', text: inputText }]);
-    // Fix: Rely on sessionPromise resolves to call sendRealtimeInput, preventing race conditions and stale closures.
+    // Rely on sessionPromise resolves to call sendRealtimeInput, preventing race conditions and stale closures.
     if (sessionPromiseRef.current) {
       sessionPromiseRef.current.then((session) => {
         session.sendRealtimeInput({ text: inputText });

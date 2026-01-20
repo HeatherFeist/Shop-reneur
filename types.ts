@@ -7,6 +7,8 @@ export interface ShippingAddress {
   country: string;
 }
 
+export type ChallengeCategory = 'Education' | 'Advertising' | 'Branding' | 'Market Research';
+
 export interface Product {
   id: string; 
   name: string;
@@ -16,13 +18,13 @@ export interface Product {
   description: string;
   imageUrl: string;
   additionalImages?: string[]; 
-  videoUrl?: string; // Link to the user's review video
-  videoReviewCompleted?: boolean; // Requirement 1
+  videoUrl?: string; 
+  videoReviewCompleted?: boolean; 
   affiliateLink: string; 
   platform: 'Amazon' | 'Shein' | 'eBay'; 
   isWishlist: boolean; 
   isReceived?: boolean; 
-  stockCount: number; // Requirement 2: Must be >= 2 (1 personal + 1 inventory)
+  stockCount: number; 
   isMarketplaceSynced?: boolean; 
   asin?: string; 
   marketplaceId?: string; 
@@ -44,9 +46,15 @@ export interface UserProfile {
   bio: string;
   avatarUrl: string;
   role: 'Owner' | 'Shopper' | 'Partner';
-  password?: string; // For Owner access
-  storeOwnerId?: string; // Links a shopper to a specific admin's store
+  password?: string; 
+  storeOwnerId?: string; 
   shippingAddress?: ShippingAddress;
+  socials?: {
+    youtube?: string;
+    instagram?: string;
+    tiktok?: string;
+    facebook?: string;
+  };
 }
 
 export interface Message {
@@ -88,10 +96,26 @@ export interface CartItem extends Product {
 }
 
 export interface ContentPrompt {
+  id: string;
   title: string;
   description: string;
-  platform: 'TikTok' | 'Instagram' | 'YouTube';
+  category: ChallengeCategory;
+  platform: 'TikTok' | 'Instagram' | 'YouTube' | 'Facebook';
   difficulty: 'Easy' | 'Medium' | 'Hard';
   xpReward: number;
+  trendingTopic: string;
   sources?: string[];
+}
+
+export interface Submission {
+  id: string;
+  challengeId: string;
+  userId: string;
+  userName: string;
+  avatar: string;
+  contentUrl: string;
+  platform: 'TikTok' | 'Instagram' | 'YouTube' | 'Facebook';
+  title: string;
+  votes: number;
+  timestamp: number;
 }

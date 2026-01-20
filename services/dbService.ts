@@ -26,7 +26,7 @@ const mapProduct = (p: any): Product => ({
 const mapProfile = (p: any): UserProfile => ({
   id: p.id,
   name: p.name,
-  handle: p.handle,
+  handle: p.username || p.handle || p.user_handle || '', // Robust mapping for various schema variations
   bio: p.bio,
   avatarUrl: p.avatar_url,
   role: p.role,
@@ -70,36 +70,55 @@ export const dbService = {
   },
 
   upsertProfile: async (profile: Partial<UserProfile>): Promise<UserProfile> => {
-    const payload = {
+    // We attempt to use 'username' first, then 'handle', then 'user_handle' based on common Supabase patterns
+    const basePayload = {
       id: profile.id,
       name: profile.name,
-      handle: profile.handle,
       bio: profile.bio,
       avatar_url: profile.avatarUrl,
       role: profile.role,
       password: profile.password
     };
+
+    // Try multiple possible column names for 'handle' if one fails
+    const tryUpsert = async (handleColumnName: string) => {
+      const payload = { ...basePayload, [handleColumnName]: profile.handle };
+      return await supabase.from('profiles').upsert(payload).select();
+    };
     
     try {
-      const { data, error } = await supabase.from('profiles').upsert(payload).select();
-      if (error) throw error;
-      if (!data || data.length === 0) throw new Error("No data returned from upsert");
+      // Attempt 1: Default to 'username' which is standard for many Supabase profile templates
+      let result = await tryUpsert('username');
       
-      const mapped = mapProfile(data[0]);
+      // Attempt 2: If 'username' fails (column doesn't exist), try 'handle'
+      if (result.error && (result.error.message.includes("username") || result.error.code === 'PGRST204')) {
+        result = await tryUpsert('handle');
+      }
+
+      // Attempt 3: If 'handle' fails, try 'user_handle'
+      if (result.error && (result.error.message.includes("handle") || result.error.code === 'PGRST204')) {
+        result = await tryUpsert('user_handle');
+      }
+
+      if (result.error) throw result.error;
+      if (!result.data || result.data.length === 0) throw new Error("No data returned from upsert");
+      
+      const mapped = mapProfile(result.data[0]);
+      
       // Sync local storage
       const local = localStorage.getItem('local_profiles');
-      const profiles = local ? JSON.parse(local) : [];
-      const updated = profiles.filter((p: any) => p.id !== mapped.id);
-      updated.push(mapped);
-      localStorage.setItem('local_profiles', JSON.stringify(updated));
+      const profilesList = local ? JSON.parse(local) : [];
+      const updatedList = profilesList.filter((p: any) => p.id !== mapped.id);
+      updatedList.push(mapped);
+      localStorage.setItem('local_profiles', JSON.stringify(updatedList));
       
       return mapped;
     } catch (error: any) {
       const errorDetail = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
-      console.error(`Upsert failed, likely missing profiles table: ${errorDetail}`);
+      console.error(`Profile upsert ultimately failed: ${errorDetail}. Falling back to local storage.`);
       
-      // Fallback to local state so the app doesn't break
-      const mapped = {
+      // Final Fallback to local state so the app doesn't break
+      const fallbackProfile = {
         id: profile.id || Date.now().toString(),
         name: profile.name || '',
         handle: profile.handle || '',
@@ -110,12 +129,12 @@ export const dbService = {
       } as UserProfile;
       
       const local = localStorage.getItem('local_profiles');
-      const profiles = local ? JSON.parse(local) : [];
-      const updated = profiles.filter((p: any) => p.id !== mapped.id);
-      updated.push(mapped);
-      localStorage.setItem('local_profiles', JSON.stringify(updated));
+      const profilesList = local ? JSON.parse(local) : [];
+      const updatedList = profilesList.filter((p: any) => p.id !== fallbackProfile.id);
+      updatedList.push(fallbackProfile);
+      localStorage.setItem('local_profiles', JSON.stringify(updatedList));
       
-      return mapped;
+      return fallbackProfile;
     }
   },
 
@@ -184,6 +203,7 @@ export const dbService = {
     return supabase.channel('settings-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'shop_settings' }, async () => {
         const { data } = await supabase.from('shop_settings').select('*').eq('id', 'global_settings').single();
+        // Fixed property naming to match ShopSettings interface and resolve TS errors
         if (data) callback({
           storeName: data.store_name,
           tagline: data.tagline,
@@ -214,6 +234,7 @@ export const dbService = {
       secondary_color: settings.secondaryColor,
       background_color: settings.backgroundColor,
       font_heading: settings.fontHeading,
+      // Fixed: settings.font_body changed to settings.fontBody to match ShopSettings interface
       font_body: settings.fontBody,
       amazon_affiliate_tag: settings.amazonAffiliateTag,
       ebay_affiliate_id: settings.ebayAffiliateId,

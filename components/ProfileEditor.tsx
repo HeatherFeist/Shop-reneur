@@ -1,7 +1,8 @@
 
 import React, { useRef, useState } from 'react';
 import { UserProfile } from '../types';
-import { Camera, Save, User, AtSign, FileText, MapPin, Truck, ShieldCheck } from 'lucide-react';
+// Added Globe to imports to fix "Cannot find name 'Globe'" error
+import { Camera, Save, User, AtSign, FileText, MapPin, Truck, ShieldCheck, Youtube, Instagram, Smartphone, Facebook, Globe } from 'lucide-react';
 
 interface ProfileEditorProps {
   profile: UserProfile;
@@ -23,17 +24,16 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ profile, onUpdateProfile 
     reader.readAsDataURL(file);
   };
 
-  const handleAddressChange = (field: keyof typeof formData.shippingAddress, value: string) => {
+  const handleSocialChange = (platform: keyof NonNullable<UserProfile['socials']>, value: string) => {
     setFormData(prev => ({
       ...prev,
-      shippingAddress: {
-        street: prev.shippingAddress?.street || '',
-        city: prev.shippingAddress?.city || '',
-        state: prev.shippingAddress?.state || '',
-        zipCode: prev.shippingAddress?.zipCode || '',
-        country: prev.shippingAddress?.country || 'USA',
-        ...prev.shippingAddress,
-        [field]: value
+      socials: {
+        youtube: '',
+        instagram: '',
+        tiktok: '',
+        facebook: '',
+        ...prev.socials,
+        [platform]: value
       }
     }));
   };
@@ -110,6 +110,66 @@ const ProfileEditor: React.FC<ProfileEditorProps> = ({ profile, onUpdateProfile 
                 className="w-full bg-white/5 border border-white/10 rounded-3xl px-8 py-6 outline-none focus:border-indigo-500 text-slate-300 font-light leading-relaxed"
                 placeholder="Tell the community about your strategic vision..."
               />
+            </div>
+          </div>
+
+          {/* Social Presence */}
+          <div className="space-y-8">
+            <div className="flex justify-between items-center border-b border-white/5 pb-4">
+              <h3 className="text-2xl font-display font-bold text-white flex items-center gap-3">
+                <Globe className="text-indigo-400" size={24} /> Social Presence
+              </h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1 flex items-center gap-2">
+                  <Youtube size={12} className="text-red-500"/> YouTube URL
+                </label>
+                <input
+                  type="url"
+                  value={formData.socials?.youtube || ''}
+                  onChange={(e) => handleSocialChange('youtube', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white text-sm"
+                  placeholder="https://youtube.com/@yourchannel"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1 flex items-center gap-2">
+                  <Instagram size={12} className="text-pink-500"/> Instagram Handle
+                </label>
+                <input
+                  type="text"
+                  value={formData.socials?.instagram || ''}
+                  onChange={(e) => handleSocialChange('instagram', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white text-sm"
+                  placeholder="@yourbrand"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1 flex items-center gap-2">
+                  <Smartphone size={12} className="text-white"/> TikTok Handle
+                </label>
+                <input
+                  type="text"
+                  value={formData.socials?.tiktok || ''}
+                  onChange={(e) => handleSocialChange('tiktok', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white text-sm"
+                  placeholder="@yourbrand"
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 px-1 flex items-center gap-2">
+                  <Facebook size={12} className="text-blue-500"/> Facebook Page URL
+                </label>
+                <input
+                  type="url"
+                  value={formData.socials?.facebook || ''}
+                  onChange={(e) => handleSocialChange('facebook', e.target.value)}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl px-6 py-4 outline-none focus:border-indigo-500 text-white text-sm"
+                  placeholder="https://facebook.com/yourpage"
+                />
+              </div>
             </div>
           </div>
 

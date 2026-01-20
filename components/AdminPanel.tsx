@@ -10,7 +10,7 @@ import {
   Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, 
   Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, 
   Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, 
-  Monitor, UserCircle, Video, Home, Lock, Unlock, AlertCircle
+  Monitor, UserCircle, Video, Home, Lock, Unlock, AlertCircle, Edit3, X
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -48,6 +48,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  
+  // Edit Mode state
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
 
   useEffect(() => { setSettingsForm(shopSettings); }, [shopSettings]);
 
@@ -71,25 +74,72 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
     setImageLoading(false);
   };
 
+  const handleEditProduct = (product: Product) => {
+    setEditingProductId(product.id);
+    setFormData({
+      name: product.name,
+      price: product.price.toString(),
+      costPrice: (product.costPrice || 0).toString(),
+      category: product.category,
+      keywords: '',
+      affiliateLink: product.affiliateLink,
+      platform: product.platform,
+      description: product.description,
+      imageUrl: product.imageUrl,
+      additionalImages: product.additionalImages || [],
+      videoUrl: product.videoUrl || '',
+      isReceived: product.isReceived || false,
+      marketplaceId: product.marketplaceId || ''
+    });
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const cancelEdit = () => {
+    setEditingProductId(null);
+    setFormData({ name: '', price: '', costPrice: '', category: ProductCategory.FASHION, keywords: '', affiliateLink: '', platform: 'Amazon', description: '', imageUrl: '', additionalImages: [], videoUrl: '', isReceived: false, marketplaceId: '' });
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onAddProduct({
-      id: Date.now().toString(),
-      name: formData.name,
-      price: parseFloat(formData.price) || 0,
-      costPrice: parseFloat(formData.costPrice) || 0,
-      category: formData.category as ProductCategory,
-      description: formData.description,
-      imageUrl: formData.imageUrl || `https://picsum.photos/seed/${formData.name}/400/500`,
-      affiliateLink: formData.affiliateLink,
-      platform: formData.platform,
-      isWishlist: true,
-      isReceived: false,
-      videoReviewCompleted: false,
-      stockCount: 0,
-      asin: formData.platform === 'Amazon' ? formData.marketplaceId : undefined,
-      marketplaceId: formData.marketplaceId
-    });
+    if (editingProductId) {
+      const existingProduct = products.find(p => p.id === editingProductId);
+      if (existingProduct) {
+        onUpdateProduct({
+          ...existingProduct,
+          name: formData.name,
+          price: parseFloat(formData.price) || 0,
+          costPrice: parseFloat(formData.costPrice) || 0,
+          category: formData.category as ProductCategory,
+          description: formData.description,
+          imageUrl: formData.imageUrl,
+          affiliateLink: formData.affiliateLink,
+          platform: formData.platform,
+          videoUrl: formData.videoUrl,
+          marketplaceId: formData.marketplaceId,
+          asin: formData.platform === 'Amazon' ? formData.marketplaceId : existingProduct.asin
+        });
+      }
+      setEditingProductId(null);
+    } else {
+      onAddProduct({
+        id: Date.now().toString(),
+        name: formData.name,
+        price: parseFloat(formData.price) || 0,
+        costPrice: parseFloat(formData.costPrice) || 0,
+        category: formData.category as ProductCategory,
+        description: formData.description,
+        imageUrl: formData.imageUrl || `https://picsum.photos/seed/${formData.name}/400/500`,
+        affiliateLink: formData.affiliateLink,
+        platform: formData.platform,
+        isWishlist: true,
+        isReceived: false,
+        videoReviewCompleted: false,
+        stockCount: 0,
+        asin: formData.platform === 'Amazon' ? formData.marketplaceId : undefined,
+        marketplaceId: formData.marketplaceId
+      });
+    }
     setFormData({ name: '', price: '', costPrice: '', category: ProductCategory.FASHION, keywords: '', affiliateLink: '', platform: 'Amazon', description: '', imageUrl: '', additionalImages: [], videoUrl: '', isReceived: false, marketplaceId: '' });
   };
 
@@ -153,10 +203,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
           <form onSubmit={handleSubmit} className="space-y-12">
             <div className="flex justify-between items-center">
               <div className="space-y-1">
-                <h3 className="text-4xl font-display font-bold text-white tracking-tight">Asset Onboarding</h3>
-                <p className="text-slate-500 text-sm">Define strategic inventory across verified global marketplaces.</p>
+                <h3 className="text-4xl font-display font-bold text-white tracking-tight">
+                  {editingProductId ? 'Refine Asset' : 'Asset Onboarding'}
+                </h3>
+                <p className="text-slate-500 text-sm">
+                  {editingProductId ? 'Updating existing verified inventory entry.' : 'Define strategic inventory across verified global marketplaces.'}
+                </p>
               </div>
-              <BusinessTip title="The 2-Unit Rule" content="New assets start as 'Incubator' items. To unlock full sales, you must provide 1 Review Video and have at least 1 unit in stock for customers (2 units total purchased)." />
+              <div className="flex items-center gap-4">
+                {editingProductId && (
+                  <button type="button" onClick={cancelEdit} className="px-6 py-2.5 bg-slate-800 text-slate-300 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-700 transition-colors flex items-center gap-2">
+                    <X size={14} /> Cancel Edit
+                  </button>
+                )}
+                <BusinessTip title="The 2-Unit Rule" content="New assets start as 'Incubator' items. To unlock full sales, you must provide 1 Review Video and have at least 1 unit in stock for customers (2 units total purchased)." />
+              </div>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -241,7 +302,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
             </div>
 
             <button type="submit" className="w-full bg-white text-black py-6 rounded-[2.5rem] font-black uppercase tracking-[0.2em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-4 group">
-              <Database size={24} className="text-indigo-600" /> Commit to Ledger
+              {editingProductId ? <><Edit3 size={24} className="text-indigo-600" /> Update Verified Entry</> : <><Database size={24} className="text-indigo-600" /> Commit to Ledger</>}
             </button>
           </form>
 
@@ -275,7 +336,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                            const isUnlocked = hasReview && stockCount >= 2;
                            
                            return (
-                            <tr key={product.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors group ${isUnlocked ? 'bg-indigo-500/[0.02]' : ''}`}>
+                            <tr key={product.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors group ${isUnlocked ? 'bg-indigo-500/[0.02]' : ''} ${editingProductId === product.id ? 'bg-white/[0.08]' : ''}`}>
                                <td className="px-8 py-6">
                                   <div className="flex items-center gap-4">
                                      <img src={product.imageUrl} className="w-12 h-12 rounded-xl object-cover border border-white/10" alt="" />
@@ -316,14 +377,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                </td>
                                <td className="px-8 py-6 text-center">
                                   <div className="flex items-center justify-center gap-2">
+                                     <button onClick={() => handleEditProduct(product)} className="p-2.5 text-slate-500 hover:text-indigo-400 hover:bg-white/5 rounded-xl transition-all" title="Edit Asset">
+                                        <Edit3 size={14} />
+                                     </button>
                                      {!hasReview && stockCount >= 1 && (
                                        <button onClick={() => handleAttachVideo(product.id)} className="p-2.5 text-white bg-rose-600 rounded-xl transition-all shadow-lg animate-pulse" title="Immediate Action: Review Video">
                                           <AlertCircle size={14} />
-                                       </button>
-                                     )}
-                                     {!hasReview && stockCount === 0 && (
-                                       <button onClick={() => handleAttachVideo(product.id)} className="p-2.5 text-indigo-400 hover:bg-indigo-500 hover:text-white rounded-xl transition-all" title="Upload Review Video">
-                                          <Video size={14} />
                                        </button>
                                      )}
                                      <button onClick={() => onDeleteProduct(product.id)} className="p-2.5 text-slate-600 hover:text-red-400 hover:bg-red-500/10 rounded-xl transition-all" title="Retire Asset">

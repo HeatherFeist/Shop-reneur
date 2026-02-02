@@ -1,7 +1,20 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+const getApiKey = () => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem('gemini_api_key') || import.meta.env.VITE_GEMINI_API_KEY;
+  }
+  return process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+};
+
+let ai: GoogleGenAI | null = null;
+const getClient = () => {
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
+  if (!ai) ai = new GoogleGenAI({ apiKey });
+  return ai;
+};
 
 export const generateProductDescription = async (
   productName: string,
@@ -9,6 +22,10 @@ export const generateProductDescription = async (
   keywords: string
 ): Promise<string> => {
   try {
+    const client = getClient();
+    if (!client) {
+      return `Check out this amazing ${productName}! Perfect for ${category.toLowerCase()} lovers.`;
+    }
     const modelName = 'gemini-3-flash-preview';
     const prompt = `
       You are a trendy, Gen Z savvy copywriter for a teenage girl's online boutique on the "Shop'reneur" platform.
@@ -18,7 +35,7 @@ export const generateProductDescription = async (
       Use emojis sparingly but effectively. Make it sound exciting!
     `;
 
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: modelName,
       contents: prompt,
     });
@@ -36,13 +53,15 @@ export const generateProductImage = async (
   description: string
 ): Promise<string | null> => {
   try {
+    const client = getClient();
+    if (!client) return null;
     const prompt = `Professional product photography of ${productName}. 
     Category: ${category}. 
     Description: ${description}. 
     Style: High-end e-commerce, clean white or pastel background, studio lighting, 4k, detailed. 
     Ensure the item is the main focus and fully visible. No text overlays.`;
 
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [{ text: prompt }],
@@ -68,9 +87,11 @@ export const generateTryOnImage = async (
   productDescription: string
 ): Promise<string | null> => {
   try {
+    const client = getClient();
+    if (!client) return null;
     const cleanBase64 = userImageBase64.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, '');
 
-    const response = await ai.models.generateContent({
+    const response = await client.models.generateContent({
       model: 'gemini-2.5-flash-image',
       contents: {
         parts: [

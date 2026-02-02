@@ -1,7 +1,8 @@
 
 {
   "hosting": {
-    "public": ".",
+    "site": "shopreneur-7bfa7",
+    "public": "dist",
     "ignore": [
       "firebase.json",
       "**/.*",

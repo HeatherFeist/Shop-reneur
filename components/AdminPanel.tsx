@@ -5,12 +5,13 @@ import { generateProductDescription, generateProductImage } from '../services/ge
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
 import ProfileEditor from './ProfileEditor';
+import HowToGuide from './HowToGuide';
 import { 
   Sparkles, Loader2, Image as ImageIcon, Save, Bot, Cloud, 
   Rocket, Palette, ArrowUpCircle, Globe, CheckCircle, Boxes, 
   Database, ShieldCheck, Tag, LayoutGrid, Info, Layers, 
   Filter, CheckCircle2, Trash2, TrendingUp, DollarSign, 
-  Monitor, UserCircle, Video, Home, Lock, Unlock, AlertCircle, Edit3, X
+  Monitor, UserCircle, Video, Home, Lock, Unlock, AlertCircle, Edit3, X, HelpCircle
 } from 'lucide-react';
 
 interface AdminPanelProps {
@@ -48,6 +49,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const [isSavingSettings, setIsSavingSettings] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
   
   // Edit Mode state
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -175,6 +177,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
   return (
     <div className="glass-card p-10 rounded-[3rem] border border-white/5 relative bg-white/[0.01]">
       <BusinessMentor isOpen={isMentorOpen} onClose={() => setIsMentorOpen(false)} onAddChallenge={() => {}} />
+      <HowToGuide isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
       
       <button onClick={() => setIsMentorOpen(true)} className="fixed bottom-10 right-10 z-50 bg-white text-black p-5 rounded-3xl shadow-2xl flex items-center gap-3 hover:scale-105 transition-transform group border border-white/10">
         <Bot size={24} className="text-indigo-600" />
@@ -216,6 +219,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                     <X size={14} /> Cancel Edit
                   </button>
                 )}
+                <button
+                  type="button"
+                  onClick={() => setIsGuideOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-600/20 transition-colors text-[10px] font-black uppercase tracking-widest"
+                  title="How to add products"
+                >
+                  <HelpCircle size={14} /> How-To Guide
+                </button>
                 <BusinessTip title="The 2-Unit Rule" content="New assets start as 'Incubator' items. To unlock full sales, you must provide 1 Review Video and have at least 1 unit in stock for customers (2 units total purchased)." />
               </div>
             </div>

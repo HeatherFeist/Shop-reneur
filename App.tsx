@@ -10,6 +10,7 @@ import DirectMessages from './components/DirectMessages';
 import ProfileEditor from './components/ProfileEditor';
 import { dbService } from './services/dbService';
 import { supabaseUrl } from './services/supabaseClient';
+import HowToGuide from './components/HowToGuide';
 import { 
   ShoppingBag, 
   LayoutGrid, 
@@ -32,7 +33,8 @@ import {
   Zap,
   User,
   Home,
-  Palette
+  Palette,
+  HelpCircle
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
@@ -73,6 +75,7 @@ const App: React.FC = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [platformFilter, setPlatformFilter] = useState<'All' | 'Amazon' | 'Shein' | 'eBay'>('All');
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
 
   const isConfigured = !supabaseUrl.includes("your-project-id");
 
@@ -369,9 +372,13 @@ const App: React.FC = () => {
           </div>
           <div className="pt-16 border-t border-white/5 flex flex-col items-center gap-12">
             <button onClick={handleAccessHub} disabled={!foundProfile || isFetching} className="w-full max-w-2xl bg-white text-black py-8 rounded-[3rem] text-xl font-black uppercase tracking-[0.3em] shadow-3xl hover:bg-slate-200 transition-all flex items-center justify-center gap-6 disabled:opacity-10 group active:scale-95">Initialize Hub Session <ArrowRight size={32} className="group-hover:translate-x-3 transition-transform" /></button>
-             <div className="flex items-center gap-12"><button onClick={() => setIsRegistering(true)} className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile<span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span></button></div>
+             <div className="flex items-center gap-12">
+               <button onClick={() => setIsRegistering(true)} className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile<span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span></button>
+               <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-3 text-slate-500 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><HelpCircle size={18} className="group-hover:scale-125 transition-transform" /> How to Add Products<span className="absolute -bottom-1 left-0 w-0 h-px bg-slate-400 group-hover:w-full transition-all"></span></button>
+             </div>
           </div>
         </div>
+        <HowToGuide isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
       </div>
     );
   }

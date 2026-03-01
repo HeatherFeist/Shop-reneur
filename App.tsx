@@ -208,6 +208,7 @@ const App: React.FC = () => {
 
   const handleUpdateProfile = async (updated: UserProfile) => {
     setCurrentUser(updated);
+    setProfiles(prev => prev.map(p => p.id === updated.id ? updated : p));
     try {
       await dbService.upsertProfile(updated);
     } catch (e) {

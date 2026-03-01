@@ -30,7 +30,8 @@ const mapProfile = (p: any): UserProfile => ({
   bio: p.bio,
   avatarUrl: p.avatar_url,
   role: p.role,
-  password: p.password
+  password: p.password,
+  socials: p.socials ?? undefined
 });
 
 export const dbService = {
@@ -77,7 +78,8 @@ export const dbService = {
       bio: profile.bio,
       avatar_url: profile.avatarUrl,
       role: profile.role,
-      password: profile.password
+      password: profile.password,
+      socials: profile.socials || null
     };
 
     // Try multiple possible column names for 'handle' if one fails
@@ -125,7 +127,8 @@ export const dbService = {
         bio: profile.bio || '',
         avatarUrl: profile.avatarUrl || '',
         role: profile.role || 'Owner',
-        password: profile.password || ''
+        password: profile.password || '',
+        socials: profile.socials ?? undefined
       } as UserProfile;
       
       const local = localStorage.getItem('local_profiles');

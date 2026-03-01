@@ -119,7 +119,7 @@ const STEPS: Step[] = [
       'Once your product reaches Enterprise Grade status, it appears on your public Storefront for customers to browse and purchase. Customers can add it to their cart and complete the checkout through your affiliate link.',
     tips: [
       'Share your storefront link with friends and family to start driving traffic.',
-      'Use the AI Business Mentor (bottom-right button) for personalised advice.',
+      'Use the AI Business Mentor (bottom-right button) for personalized advice.',
     ],
   },
 ];

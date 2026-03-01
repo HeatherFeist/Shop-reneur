@@ -140,13 +140,33 @@ export const dbService = {
 
   // --- Products ---
   subscribeToProducts: (callback: (products: Product[]) => void) => {
+    const loadFromLocal = () => {
+      try {
+        const local = localStorage.getItem('local_products');
+        callback(local ? JSON.parse(local) : []);
+      } catch {
+        callback([]);
+      }
+    };
+
     supabase.from('products').select('*').order('created_at', { ascending: false })
-      .then(({ data }) => { if (data) callback(data.map(mapProduct)); });
+      .then(({ data, error }) => {
+        if (error || !data) {
+          loadFromLocal();
+        } else {
+          callback(data.map(mapProduct));
+        }
+      })
+      .catch(() => loadFromLocal());
 
     return supabase.channel('products-realtime')
       .on('postgres_changes' as any, { event: '*', schema: 'public', table: 'products' }, async () => {
         const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false });
-        if (data) callback(data.map(mapProduct));
+        if (data) {
+          const mapped = data.map(mapProduct);
+          try { localStorage.setItem('local_products', JSON.stringify(mapped)); } catch { /* quota exceeded */ }
+          callback(mapped);
+        }
       }).subscribe();
   },
 
@@ -174,11 +194,55 @@ export const dbService = {
     const { error } = product.id 
       ? await supabase.from('products').update(dbPayload).eq('id', product.id)
       : await supabase.from('products').insert([dbPayload]);
-    if (error) console.error("Product Save Error:", error);
+    if (error) {
+      console.error("Product Save Error:", error);
+      // Fallback: persist to local storage so data isn't lost offline
+      const fullProduct: Product = {
+        id: product.id || crypto.randomUUID(),
+        name: product.name || '',
+        price: product.price || 0,
+        costPrice: product.costPrice || 0,
+        category: product.category || '',
+        description: product.description || '',
+        imageUrl: product.imageUrl || '',
+        additionalImages: product.additionalImages || [],
+        videoUrl: product.videoUrl || null,
+        videoReviewCompleted: product.videoReviewCompleted || false,
+        affiliateLink: product.affiliateLink || '',
+        platform: product.platform || 'Amazon',
+        isWishlist: product.isWishlist || false,
+        isReceived: product.isReceived || false,
+        stockCount: product.stockCount || 0,
+        isMarketplaceSynced: product.isMarketplaceSynced || false,
+        asin: product.asin || '',
+        marketplaceId: product.marketplaceId || null,
+      };
+      try {
+        const local = localStorage.getItem('local_products');
+        const list: Product[] = local ? JSON.parse(local) : [];
+        // Preserve original position for updates; append new products at end
+        const existingIndex = list.findIndex(p => p.id === fullProduct.id);
+        if (existingIndex >= 0) {
+          list[existingIndex] = fullProduct;
+        } else {
+          list.push(fullProduct);
+        }
+        localStorage.setItem('local_products', JSON.stringify(list));
+      } catch { /* quota exceeded or private browsing */ }
+    }
   },
 
   deleteProduct: async (productId: string) => {
-    await supabase.from('products').delete().eq('id', productId);
+    const { error } = await supabase.from('products').delete().eq('id', productId);
+    if (error) {
+      try {
+        const local = localStorage.getItem('local_products');
+        if (local) {
+          const list: Product[] = JSON.parse(local);
+          localStorage.setItem('local_products', JSON.stringify(list.filter(p => p.id !== productId)));
+        }
+      } catch { /* quota exceeded or private browsing */ }
+    }
   },
 
   // --- Settings ---

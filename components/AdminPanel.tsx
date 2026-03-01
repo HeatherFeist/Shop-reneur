@@ -227,7 +227,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                 >
                   <HelpCircle size={14} /> How-To Guide
                 </button>
-                <BusinessTip title="The 2-Unit Rule" content="New assets start as 'Incubator' items. To unlock full sales, you must provide 1 Review Video and have at least 1 unit in stock for customers (2 units total purchased)." />
+                <BusinessTip title="The 3-Unit Rule" content="New assets start as 'Incubator' items. Purchase your 1st unit personally to test it, then upload a review video. Purchase 2 more units (3 total) to unlock full marketplace sales." />
               </div>
             </div>
             
@@ -344,7 +344,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                            const margin = product.price - (product.costPrice || 0);
                            const stockCount = product.stockCount || 0;
                            const hasReview = product.videoReviewCompleted;
-                           const isUnlocked = hasReview && stockCount >= 2;
+                           const isUnlocked = hasReview && stockCount >= 3;
                            
                            return (
                             <tr key={product.id} className={`border-b border-white/5 hover:bg-white/[0.04] transition-colors group ${isUnlocked ? 'bg-indigo-500/[0.02]' : ''} ${editingProductId === product.id ? 'bg-white/[0.08]' : ''}`}>
@@ -363,7 +363,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
                                         <div title="Review Video" className={`p-1.5 rounded-md ${hasReview ? 'bg-emerald-500/20 text-emerald-400' : 'bg-rose-500/20 text-rose-400'}`}>
                                            <Video size={12} />
                                         </div>
-                                        <div title={`Stock: ${stockCount}/2`} className={`p-1.5 rounded-md ${stockCount >= 2 ? 'bg-emerald-500/20 text-emerald-400' : stockCount >= 1 ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-slate-700'}`}>
+                                        <div title={`Stock: ${stockCount}/3`} className={`p-1.5 rounded-md ${stockCount >= 3 ? 'bg-emerald-500/20 text-emerald-400' : stockCount >= 1 ? 'bg-amber-500/20 text-amber-400' : 'bg-white/5 text-slate-700'}`}>
                                            <Boxes size={12} />
                                         </div>
                                      </div>

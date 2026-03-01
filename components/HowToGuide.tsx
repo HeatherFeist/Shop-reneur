@@ -102,13 +102,14 @@ const STEPS: Step[] = [
   },
   {
     number: 9,
-    title: 'Unlock the Product (The 2-Unit Rule)',
+    title: 'Unlock the Product (The 3-Unit Rule)',
     icon: <Video size={28} />,
     description:
-      'New products start locked in the "Incubator Phase". To unlock them for public sales:\n1. Purchase at least 1 unit through the storefront to add it to your personal stock.\n2. Record a short video review (TikTok or Reels) and attach the link using the alert button in the Lifecycle Ledger.\n3. Purchase a 2nd unit — you will now reach "Enterprise Grade" status and your product is fully unlocked.',
+      'New products start locked in the "Incubator Phase". To unlock them for public marketplace sales you must complete three steps:\n1. Purchase your 1st unit (personal use) — this is your test unit to try the product yourself.\n2. Record an honest review video on TikTok or Instagram Reels, then attach the link using the alert button in the Lifecycle Ledger.\n3. Purchase 2 more units (3 total) — once you have 3 units purchased AND a review video, the product reaches "Enterprise Grade" status and is fully unlocked.',
     tips: [
-      '"Personal Stock Only" means you have a unit but still need a review video.',
-      '"Enterprise Grade" products are visible and purchasable by your customers.',
+      'Your 1st unit is just for you — test it and make sure you love it before selling.',
+      '"Personal Stock Only" means you have a unit but still need to upload your review video.',
+      '"Enterprise Grade" requires 3 total units purchased + a review video.',
     ],
   },
   {

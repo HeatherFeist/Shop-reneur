@@ -462,7 +462,7 @@ const App: React.FC = () => {
         )}
       </main>
 
-      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={handlePurchaseComplete} />
+      <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={currentUser || undefined} onPurchaseComplete={handlePurchaseComplete} onUploadReview={(productId, videoUrl) => { const product = products.find(p => p.id === productId); if (product) handleUpdateProduct({ ...product, videoUrl, videoReviewCompleted: true }); }} />
 
       <footer className="bg-white/[0.02] border-t border-white/5 py-16 px-8 flex flex-col items-center gap-6"><div className="flex items-center gap-10"><div className="bg-white/5 px-6 py-2.5 rounded-2xl border border-white/10 flex items-center gap-3"><div className={`w-2 h-2 rounded-full ${isDbConnected ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`}></div><span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">{isDbConnected ? 'Secure Cloud Hub' : 'Local Archive'}</span></div>{!isOwner && (<button onClick={() => { setCurrentUser(null); setSearchStoreName(''); }} className="text-[10px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors tracking-widest flex items-center gap-2"><Settings2 size={12} /> Access Management Console</button>)}</div><p className="text-slate-600 text-sm font-light">Infrastructure v3.2 | Enterprise Solutions Inc.</p></footer>
     </div>

@@ -1,0 +1,56 @@
+name: Deploy to Firebase Hosting
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read       # checkout
+      pull-requests: write # post preview URL as a PR comment
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build app
+        run: npm run build
+        env:
+          # Optional — AI features are disabled if this secret is not set,
+          # but the rest of the app builds and works without it.
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+
+      # Deploy to live channel when pushing to main
+      - name: Deploy to live (main branch only)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SMART_HUB7FBA7 }}
+          channelId: live
+          projectId: smart-hub7fba7
+
+      # Deploy a temporary preview URL for every pull request
+      - name: Deploy preview (pull requests only)
+        if: github.event_name == 'pull_request'
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SMART_HUB7FBA7 }}
+          projectId: smart-hub7fba7
+          # channelId is omitted — Firebase auto-generates a unique preview URL per PR

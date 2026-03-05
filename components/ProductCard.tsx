@@ -28,14 +28,16 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onAddToCart,
   onUploadReview 
 }) => {
+  const MARKETPLACE_THRESHOLD = 3;
   const stockCount = product.stockCount || 0;
   const hasReview = !!product.videoUrl || product.videoReviewCompleted;
   
-  // LOGIC: 1st unit is personal/review. 2nd+ unit is inventory.
-  // Must have review AND at least 2 units total (1 personal + 1 for sale)
-  const isUnlocked = hasReview && stockCount >= 2;
+  // LOGIC: 1st unit is personal/review. 2nd & 3rd units are for sale.
+  // Must have review AND at least 3 units total (1 personal + 2 for sale)
+  const isUnlocked = hasReview && stockCount >= MARKETPLACE_THRESHOLD;
   const needsReview = stockCount >= 1 && !hasReview;
-  const needsStock = hasReview && stockCount < 2;
+  const needsStock = hasReview && stockCount < MARKETPLACE_THRESHOLD;
+  const purchasesNeeded = Math.max(0, MARKETPLACE_THRESHOLD - stockCount);
 
   const getPlatformBadge = () => {
     switch(product.platform) {
@@ -69,7 +71,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
              </span>
            ) : needsStock ? (
              <span className="bg-amber-500/20 backdrop-blur-md text-amber-300 border border-amber-500/30 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5">
-               <Package size={10} /> Stock Required (1/2)
+               <Package size={10} /> Stock Required ({stockCount}/{MARKETPLACE_THRESHOLD})
              </span>
            ) : isUnlocked ? (
              <span className="bg-emerald-500/20 backdrop-blur-md text-emerald-300 border border-emerald-500/30 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5">
@@ -87,6 +89,19 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <Play size={16} fill="currentColor" />
            </a>
         )}
+
+        {/* Purchase counter — red below threshold, green when met */}
+        <div
+          title={stockCount >= MARKETPLACE_THRESHOLD ? 'Marketplace threshold reached' : `${purchasesNeeded} more purchase${purchasesNeeded === 1 ? '' : 's'} needed to list on Marketplace`}
+          className={`absolute bottom-4 right-4 z-10 flex items-center gap-1.5 px-3 py-1.5 rounded-full backdrop-blur-md font-black text-xs border shadow-lg ${
+            stockCount >= MARKETPLACE_THRESHOLD
+              ? 'bg-emerald-500/90 border-emerald-400 text-white'
+              : 'bg-red-500/90 border-red-400 text-white'
+          }`}
+        >
+          <ShoppingBag size={12} />
+          {stockCount}/{MARKETPLACE_THRESHOLD}
+        </div>
       </div>
       
       <div className="p-8 flex-1 flex flex-col space-y-4">
@@ -131,7 +146,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           {!isUnlocked && (
             <div className="px-4 py-2 bg-white/5 rounded-xl border border-white/5">
               <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest text-center leading-relaxed">
-                 {!hasReview ? "Step 1: Admin Video Review Required" : `Step 2: Purchase Customer Stock (${stockCount}/2)`}
+                 {!hasReview ? "Step 1: Buy & Test Your Personal Unit — Then Upload Review" : `Step 2: Purchase Customer Stock (${stockCount}/${MARKETPLACE_THRESHOLD})`}
               </p>
             </div>
           )}

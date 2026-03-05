@@ -85,26 +85,26 @@ const CommunityLobby: React.FC<CommunityLobbyProps> = ({ creatorStats, onVote, o
       {activeTab === 'socials' && (
         <div className="animate-fadeIn space-y-12">
            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <a href="https://studio.youtube.com/channel/create" target="_blank" className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-red-500/30 transition-all flex flex-col items-center text-center space-y-4">
+              <a href="https://studio.youtube.com/channel/create" target="_blank" rel="noopener noreferrer" className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-red-500/30 transition-all flex flex-col items-center text-center space-y-4">
                  <div className="w-16 h-16 bg-red-600/10 rounded-2xl flex items-center justify-center text-red-500 group-hover:scale-110 transition-transform"><Youtube size={32} /></div>
                  <div><h4 className="font-bold text-white">YouTube</h4><p className="text-[10px] uppercase font-black tracking-widest text-slate-500">Video Empire</p></div>
                  <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-2 pt-4">Create Channel <PlusCircle size={14}/></span>
               </a>
-              <button className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-pink-500/30 transition-all flex flex-col items-center text-center space-y-4">
+              <a href="https://business.instagram.com/" target="_blank" rel="noopener noreferrer" className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-pink-500/30 transition-all flex flex-col items-center text-center space-y-4">
                  <div className="w-16 h-16 bg-pink-600/10 rounded-2xl flex items-center justify-center text-pink-500 group-hover:scale-110 transition-transform"><Instagram size={32} /></div>
                  <div><h4 className="font-bold text-white">Instagram</h4><p className="text-[10px] uppercase font-black tracking-widest text-slate-500">Aesthetic Branding</p></div>
-                 <span className="text-[10px] font-bold text-slate-500 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
-              </button>
-              <button className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-indigo-500/30 transition-all flex flex-col items-center text-center space-y-4">
+                 <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
+              </a>
+              <a href="https://www.tiktok.com/signup" target="_blank" rel="noopener noreferrer" className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-indigo-500/30 transition-all flex flex-col items-center text-center space-y-4">
                  <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center text-white group-hover:scale-110 transition-transform"><Smartphone size={32} /></div>
                  <div><h4 className="font-bold text-white">TikTok</h4><p className="text-[10px] uppercase font-black tracking-widest text-slate-500">Viral Growth</p></div>
-                 <span className="text-[10px] font-bold text-slate-500 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
-              </button>
-              <button className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-blue-500/30 transition-all flex flex-col items-center text-center space-y-4">
+                 <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
+              </a>
+              <a href="https://www.facebook.com/pages/create" target="_blank" rel="noopener noreferrer" className="glass-card p-8 rounded-[2rem] border border-white/5 group hover:border-blue-500/30 transition-all flex flex-col items-center text-center space-y-4">
                  <div className="w-16 h-16 bg-blue-600/10 rounded-2xl flex items-center justify-center text-blue-500 group-hover:scale-110 transition-transform"><Facebook size={32} /></div>
                  <div><h4 className="font-bold text-white">Facebook</h4><p className="text-[10px] uppercase font-black tracking-widest text-slate-500">Community Reach</p></div>
-                 <span className="text-[10px] font-bold text-slate-500 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
-              </button>
+                 <span className="text-[10px] font-bold text-indigo-400 flex items-center gap-2 pt-4">Connect Account <Link2 size={14}/></span>
+              </a>
            </div>
         </div>
       )}
@@ -156,7 +156,7 @@ const CommunityLobby: React.FC<CommunityLobbyProps> = ({ creatorStats, onVote, o
                 <div className="mt-auto pt-6 border-t border-white/5 flex items-center justify-between">
                   <div className="flex gap-4">
                     {challenge.sources?.slice(0, 1).map((s, i) => (
-                      <a key={i} href={s} target="_blank" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors"><Globe size={10}/> Research Data</a>
+                      <a key={i} href={s} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-indigo-400 transition-colors"><Globe size={10}/> Research Data</a>
                     ))}
                   </div>
                   <button onClick={() => alert("Submission Active: Drop your link below!")} className="bg-white text-black px-6 py-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-all">Start Task</button>

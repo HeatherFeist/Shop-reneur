@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { CartItem, ShopSettings, UserProfile } from '../types';
-import { X, ShoppingBag, ExternalLink, Trash2, Gift, ShieldCheck, CheckCircle, Loader2, ArrowRight, ShoppingCart, Info, RotateCcw, AlertTriangle } from 'lucide-react';
+import { X, ShoppingBag, ExternalLink, Trash2, Gift, ShieldCheck, CheckCircle, Loader2, ArrowRight, ShoppingCart, Info, RotateCcw, AlertTriangle, Video } from 'lucide-react';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -11,6 +11,7 @@ interface CartDrawerProps {
   shopSettings: ShopSettings;
   userProfile?: UserProfile;
   onPurchaseComplete?: (itemIds: string[]) => void;
+  onUploadReview?: (productId: string, videoUrl: string) => void;
 }
 
 const CartDrawer: React.FC<CartDrawerProps> = ({ 
@@ -19,9 +20,25 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
   cartItems, 
   onRemoveItem, 
   shopSettings, 
-  onPurchaseComplete 
+  onPurchaseComplete,
+  onUploadReview
 }) => {
-  const [view, setView] = useState<'cart' | 'transferring' | 'confirm' | 'success'>('cart');
+  const [view, setView] = useState<'cart' | 'transferring' | 'confirm' | 'review' | 'success'>('cart');
+  const [reviewVideoUrl, setReviewVideoUrl] = useState('');
+
+  // Reset view and review URL whenever the drawer closes
+  useEffect(() => {
+    if (!isOpen) {
+      const timer = setTimeout(() => {
+        setView('cart');
+        setReviewVideoUrl('');
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
+
+  // The first item in the cart whose stockCount was 0 before purchase (first-time buy)
+  const firstPurchaseItem = cartItems.find(item => (item.stockCount || 0) === 0);
   
   const amazonItems = cartItems.filter(i => i.platform === 'Amazon');
   const otherItems = cartItems.filter(i => i.platform !== 'Amazon');
@@ -67,7 +84,20 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
     if (onPurchaseComplete) {
       onPurchaseComplete(cartItems.map(i => i.id));
     }
-    setView('success');
+    // Automatically redirect to video upload if this is a first purchase and handler is available
+    if (firstPurchaseItem && onUploadReview) {
+      setView('review');
+    } else {
+      setView('success');
+    }
+  };
+
+  const handleSubmitReview = () => {
+    if (onUploadReview && reviewVideoUrl.trim() && firstPurchaseItem) {
+      onUploadReview(firstPurchaseItem.id, reviewVideoUrl.trim());
+      setReviewVideoUrl('');
+      setView('success');
+    }
   };
 
   const handleCancelVerification = () => {
@@ -209,6 +239,61 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
             </div>
           )}
 
+          {view === 'review' && firstPurchaseItem && (
+            <div className="flex-1 p-8 flex flex-col justify-center space-y-6">
+              <div className="glass-card p-8 rounded-3xl border border-rose-500/20 space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-rose-500/20 border border-rose-500/30 rounded-2xl flex items-center justify-center text-rose-400 shrink-0">
+                    <Video size={28} />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-black uppercase tracking-widest text-rose-400 mb-1">Next Required Step</p>
+                    <h3 className="text-xl font-display font-bold text-white leading-tight">Upload Your Review Video</h3>
+                  </div>
+                </div>
+
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  Your 1st unit is your personal test copy — try the product and record an honest review on <strong className="text-white">TikTok</strong> or <strong className="text-white">Instagram Reels</strong>. Paste the link below to unlock the next stage.
+                </p>
+
+                <div className="flex items-center gap-3 p-4 bg-white/5 rounded-2xl border border-white/10">
+                  <img src={firstPurchaseItem.imageUrl} className="w-12 h-12 rounded-xl object-cover shrink-0" alt="" />
+                  <div className="min-w-0">
+                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">Product</p>
+                    <p className="font-bold text-white text-sm truncate">{firstPurchaseItem.name}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500">Review Video Link (TikTok / Reels)</label>
+                  <input
+                    type="url"
+                    value={reviewVideoUrl}
+                    onChange={e => setReviewVideoUrl(e.target.value)}
+                    placeholder="https://www.tiktok.com/@yourprofile/video/..."
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl px-5 py-4 outline-none focus:border-rose-500 text-white text-sm placeholder:text-slate-700"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <button
+                    onClick={handleSubmitReview}
+                    disabled={!reviewVideoUrl.trim()}
+                    className="w-full bg-rose-600 text-white font-bold py-4 rounded-xl hover:bg-rose-500 transition-all shadow-xl disabled:opacity-40 flex items-center justify-center gap-2"
+                  >
+                    <Video size={16} /> Submit Review & Continue
+                  </button>
+                  <button
+                    onClick={() => setView('success')}
+                    className="w-full bg-white/5 text-slate-400 py-3 rounded-xl hover:text-white transition-all text-sm"
+                  >
+                    Skip for Now — I'll Upload Later
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {view === 'success' && (
              <div className="flex-1 flex flex-col items-center justify-center p-8 text-center space-y-8">
                 <div className="w-24 h-24 bg-emerald-500/20 border border-emerald-500/40 rounded-full flex items-center justify-center text-emerald-400 shadow-2xl shadow-emerald-500/20 animate-bounce">
@@ -216,7 +301,7 @@ const CartDrawer: React.FC<CartDrawerProps> = ({
                 </div>
                 <div className="space-y-4">
                   <h3 className="text-3xl font-display font-bold text-white">Logistics Complete</h3>
-                  <p className="text-slate-400 font-light">Assets are now marked as "Received". Remember to upload your video review to unlock global marketplace sales!</p>
+                  <p className="text-slate-400 font-light">Unit acquired and recorded. Purchase 3 units total (1 personal + 2 for sales) with a review video to reach Enterprise Grade status.</p>
                 </div>
                 <button onClick={onClose} className="w-full bg-white text-black py-4 rounded-xl font-bold">Return to Hub</button>
              </div>

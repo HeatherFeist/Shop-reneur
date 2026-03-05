@@ -28,6 +28,7 @@ export interface Product {
   isMarketplaceSynced?: boolean; 
   asin?: string; 
   marketplaceId?: string; 
+  ownerId?: string; 
 }
 
 export enum ProductCategory {
@@ -94,6 +95,10 @@ export interface CartItem extends Product {
   quantity: number;
   orderType: 'purchase' | 'gift';
 }
+
+/** Returns true when a product is eligible to appear in the shared Marketplace */
+export const isMarketplaceEligible = (product: Product): boolean =>
+  (product.stockCount >= 3 && !!product.videoReviewCompleted) || !!product.isMarketplaceSynced;
 
 export interface ContentPrompt {
   id: string;

@@ -20,7 +20,8 @@ const mapProduct = (p: any): Product => ({
   stockCount: p.stock_count || 0,
   isMarketplaceSynced: p.is_marketplace_synced || false,
   asin: p.asin,
-  marketplaceId: p.marketplace_id
+  marketplaceId: p.marketplace_id,
+  ownerId: p.owner_id || undefined
 });
 
 const mapProfile = (p: any): UserProfile => ({
@@ -192,6 +193,7 @@ export const dbService = {
       is_marketplace_synced: product.isMarketplaceSynced,
       asin: product.asin,
       marketplace_id: product.marketplaceId,
+      owner_id: product.ownerId ?? null,
       updated_at: new Date()
     };
     const { error } = product.id 
@@ -219,6 +221,7 @@ export const dbService = {
         isMarketplaceSynced: product.isMarketplaceSynced || false,
         asin: product.asin || '',
         marketplaceId: product.marketplaceId || null,
+        ownerId: product.ownerId || undefined,
       };
       try {
         const local = localStorage.getItem('local_products');

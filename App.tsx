@@ -8,6 +8,7 @@ import VirtualTryOn from './components/VirtualTryOn';
 import CommunityLobby from './components/CommunityLobby';
 import DirectMessages from './components/DirectMessages';
 import ProfileEditor from './components/ProfileEditor';
+import Marketplace from './components/Marketplace';
 import { dbService } from './services/dbService';
 import { supabaseUrl } from './services/supabaseClient';
 import HowToGuide from './components/HowToGuide';
@@ -34,7 +35,8 @@ import {
   User,
   Home,
   Palette,
-  HelpCircle
+  HelpCircle,
+  Globe
 } from 'lucide-react';
 
 const INITIAL_SETTINGS: ShopSettings = {
@@ -71,11 +73,12 @@ const App: React.FC = () => {
   const [regSuccess, setRegSuccess] = useState(false);
 
   // General UI State
-  const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages' | 'profile'>('shop');
+  const [activeTab, setActiveTab] = useState<'shop' | 'tryon' | 'admin' | 'community' | 'messages' | 'profile' | 'marketplace'>('shop');
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [cart, setCart] = useState<CartItem[]>([]);
   const [platformFilter, setPlatformFilter] = useState<'All' | 'Amazon' | 'Shein' | 'eBay'>('All');
   const [isGuideOpen, setIsGuideOpen] = useState(false);
+  const [preLoginView, setPreLoginView] = useState<'portal' | 'marketplace'>('portal');
 
   const isConfigured = !supabaseUrl.includes("your-project-id");
 
@@ -217,7 +220,9 @@ const App: React.FC = () => {
   };
 
   const handleAddProduct = async (productOrProducts: Product | Product[]) => {
-    const itemsToAdd = Array.isArray(productOrProducts) ? productOrProducts : [productOrProducts];
+    if (!currentUser) return;
+    const itemsToAdd = (Array.isArray(productOrProducts) ? productOrProducts : [productOrProducts])
+      .map(p => ({ ...p, ownerId: p.ownerId || currentUser.id }));
     setProducts(prev => [...itemsToAdd, ...prev]);
     try {
       for (const item of itemsToAdd) { 
@@ -302,6 +307,41 @@ const App: React.FC = () => {
   const isOwner = currentUser?.role === 'Owner';
 
   if (!currentUser) {
+    // Pre-login marketplace browsing
+    if (preLoginView === 'marketplace') {
+      return (
+        <div className="min-h-screen bg-[#020617] text-slate-200">
+          <nav className="sticky top-0 z-50 glass-nav px-8 h-20 flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <div className="bg-indigo-600 text-white p-2.5 rounded-xl h-12 w-12 flex items-center justify-center">
+                <LayoutGrid size={22} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold font-display text-white leading-none tracking-tight">{shopSettings.storeName}</h1>
+                <p className="text-[9px] font-black text-indigo-400 uppercase tracking-widest mt-1.5">Marketplace</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setPreLoginView('portal')}
+              className="px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest bg-white text-black hover:bg-slate-200 transition-all shadow-xl"
+            >
+              Owner Login
+            </button>
+          </nav>
+          <main className="max-w-7xl mx-auto px-6 py-12 w-full">
+            <Marketplace
+              products={products}
+              profiles={profiles}
+              currentUser={null}
+              onAddToCart={(product, orderType) => { setCart([...cart, { ...product, quantity: 1, orderType }]); setIsCartOpen(true); }}
+              onBack={() => setPreLoginView('portal')}
+            />
+          </main>
+          <CartDrawer isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cart} onRemoveItem={(id) => setCart(cart.filter(i => i.id !== id))} shopSettings={shopSettings} userProfile={undefined} onPurchaseComplete={() => setCart([])} onUploadReview={() => {}} />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
         <div className="absolute top-0 -left-20 w-[40rem] h-[40rem] bg-indigo-600/5 rounded-full blur-[150px] animate-pulse"></div>
@@ -384,6 +424,16 @@ const App: React.FC = () => {
                <button onClick={() => setIsRegistering(true)} className="flex items-center gap-3 text-indigo-400 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><UserPlus size={18} className="group-hover:scale-125 transition-transform" /> Build Your Profile<span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-400 group-hover:w-full transition-all"></span></button>
                <button onClick={() => setIsGuideOpen(true)} className="flex items-center gap-3 text-slate-500 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative"><HelpCircle size={18} className="group-hover:scale-125 transition-transform" /> How to Add Products<span className="absolute -bottom-1 left-0 w-0 h-px bg-slate-400 group-hover:w-full transition-all"></span></button>
              </div>
+             {/* Browse Marketplace without logging in */}
+             <button
+               onClick={() => setPreLoginView('marketplace')}
+               disabled={isFetching}
+               className="flex items-center gap-3 text-indigo-300 hover:text-white transition-all text-xs font-black uppercase tracking-[0.3em] group relative disabled:opacity-30"
+             >
+               <Globe size={18} className="group-hover:scale-125 transition-transform" />
+               Browse Marketplace
+               <span className="absolute -bottom-1 left-0 w-0 h-px bg-indigo-300 group-hover:w-full transition-all"></span>
+             </button>
           </div>
         </div>
         <HowToGuide isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
@@ -403,6 +453,7 @@ const App: React.FC = () => {
         <div className="flex items-center gap-6">
           <div className="hidden lg:flex items-center gap-10 mr-4">
             <button onClick={() => setActiveTab('shop')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'shop' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Storefront</button>
+            <button onClick={() => setActiveTab('marketplace')} className={`text-xs font-black uppercase tracking-widest transition-colors flex items-center gap-1.5 ${activeTab === 'marketplace' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}><Globe size={13} />Marketplace</button>
             <button onClick={() => setActiveTab('tryon')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'tryon' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Studio</button>
             {isOwner && <button onClick={() => setActiveTab('community')} className={`text-xs font-black uppercase tracking-widest transition-colors ${activeTab === 'community' ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'}`}>Network</button>}
           </div>
@@ -441,6 +492,16 @@ const App: React.FC = () => {
                {categorizedProducts.length > 0 ? categorizedProducts.map((group) => (<section key={group.category} className="space-y-8 pb-12"><div className="flex items-center gap-4"><div className="h-px flex-1 bg-white/5"></div><h4 className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">{group.category}</h4><div className="h-px flex-1 bg-white/5"></div></div><div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">{group.items.map(p => (<ProductCard key={p.id} product={p} userRole={isOwner ? 'admin' : 'shopper'} onDelete={handleDeleteProduct} onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }} onUploadReview={handleAttachVideo} />))}</div></section>)) : (<div className="py-20 text-center space-y-4 opacity-30"><Monitor size={48} className="mx-auto" /><p className="font-display text-2xl text-slate-600">Boutique Inventory Pending...</p></div>)}
             </div>
           </div>
+        )}
+
+        {activeTab === 'marketplace' && (
+          <Marketplace
+            products={products}
+            profiles={profiles}
+            currentUser={currentUser}
+            onAddToCart={(p, type) => { setCart([...cart, { ...p, quantity: 1, orderType: type }]); setIsCartOpen(true); }}
+            onBack={() => setActiveTab('shop')}
+          />
         )}
         
         {activeTab === 'messages' && currentUser && isOwner && <DirectMessages currentUser={currentUser} allMessages={allMessages} onSendMessage={(text, recipientId) => dbService.sendMessage({ senderId: currentUser.id, recipientId, text, timestamp: Date.now() })} onDeleteMessage={dbService.deleteMessage} otherProfiles={profiles.filter(p => p.id !== currentUser.id)} />}

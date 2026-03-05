@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { ProductCategory, Product, CreatorStats, ShopSettings, UserProfile } from '../types';
+import { ProductCategory, Product, CreatorStats, ShopSettings, UserProfile, isMarketplaceEligible } from '../types';
 import { generateProductDescription, generateProductImage } from '../services/geminiService';
 import BusinessTip from './BusinessTip';
 import BusinessMentor from './BusinessMentor';
@@ -468,10 +468,70 @@ const AdminPanel: React.FC<AdminPanelProps> = ({
       )}
 
       {activeAdminTab === 'marketplace' && (
-        <div className="animate-fadeIn space-y-12 text-center py-20">
-           <Rocket size={64} className="mx-auto text-slate-700 mb-6" />
-           <h3 className="text-3xl font-display font-bold text-white">Marketplace Promotion</h3>
-           <p className="text-slate-500 max-w-xl mx-auto">Promote fulfilled incubator assets to the public storefront to generate external revenue.</p>
+        <div className="animate-fadeIn space-y-12">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-4xl font-display font-bold text-white tracking-tight">Marketplace Presence</h3>
+              <p className="text-slate-500 text-sm mt-1">Your products listed in the shared Shop'reneur Marketplace.</p>
+            </div>
+          </div>
+
+          {/* Stats row */}
+          {(() => {
+            const owned = products.filter(p => p.ownerId === currentUser.id);
+            const listed = owned.filter(isMarketplaceEligible);
+            const pending = owned.filter(p => !isMarketplaceEligible(p));
+            return (
+              <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="glass-card p-8 rounded-[2rem] border border-emerald-500/20 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-emerald-400">Live in Marketplace</p>
+                    <p className="text-5xl font-display font-bold text-white">{listed.length}</p>
+                    <p className="text-slate-500 text-xs">Products visible to all shoppers</p>
+                  </div>
+                  <div className="glass-card p-8 rounded-[2rem] border border-amber-500/20 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-amber-400">In Progress</p>
+                    <p className="text-5xl font-display font-bold text-white">{pending.length}</p>
+                    <p className="text-slate-500 text-xs">Need review or more stock</p>
+                  </div>
+                  <div className="glass-card p-8 rounded-[2rem] border border-white/5 space-y-2">
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Total Products</p>
+                    <p className="text-5xl font-display font-bold text-white">{owned.length}</p>
+                    <p className="text-slate-500 text-xs">In your inventory</p>
+                  </div>
+                </div>
+
+                {listed.length > 0 ? (
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-slate-500">Currently Listed</h4>
+                    <div className="overflow-hidden rounded-[2rem] border border-white/5">
+                      {listed.map(product => (
+                        <div key={product.id} className="flex items-center gap-6 px-8 py-5 border-b border-white/5 hover:bg-white/[0.02] transition-colors last:border-b-0">
+                          <img src={product.imageUrl} className="w-12 h-12 rounded-xl object-cover border border-white/10" alt="" />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-white text-sm truncate">{product.name}</p>
+                            <p className="text-[9px] font-black uppercase tracking-widest text-slate-500">{product.category}</p>
+                          </div>
+                          <span className="text-white font-bold">${product.price.toFixed(2)}</span>
+                          <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest flex items-center gap-1.5">
+                            <ShieldCheck size={9} /> Live
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-20 text-center space-y-4 border-2 border-dashed border-white/5 rounded-[3rem]">
+                    <Rocket size={48} className="mx-auto text-slate-700" />
+                    <h4 className="text-xl font-display font-bold text-slate-500">No Products Listed Yet</h4>
+                    <p className="text-slate-600 text-sm max-w-md mx-auto">
+                      To list a product in the marketplace, purchase 3 units and upload a review video. Products are automatically listed once you reach this milestone.
+                    </p>
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
       )}
     </div>
